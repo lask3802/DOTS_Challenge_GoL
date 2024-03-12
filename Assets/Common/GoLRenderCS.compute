@@ -1,0 +1,41 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> Result;
+
+StructuredBuffer<int> GoLData;
+uint Width;
+[numthreads(1,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    const int alive_0 = GoLData[id.x+id.y*Width/4] & 0x1;
+    const int alive_1 = GoLData[id.x+id.y*Width/4]>>8 & 0x1;
+    const int alive_2 = GoLData[id.x+id.y*Width/4]>>16 & 0x1;
+    const int alive_3 = GoLData[id.x+id.y*Width/4]>>24 & 0x1;
+
+    int2 idx1 = int2(4*id.x, id.y);
+    int2 idx2 = int2(4*id.x+1, id.y);
+    int2 idx3 = int2(4*id.x+2, id.y);
+    int2 idx4 = int2(4*id.x+3, id.y);
+    Result[idx1] = float4(alive_0 * float3(1,1,1),1) ; 
+    Result[idx2] = float4(alive_1 * float3(1,1,1),1) ; 
+    Result[idx3] = float4(alive_2 * float3(1,1,1),1) ; 
+    Result[idx4] = float4(alive_3 * float3(1,1,1),1) ; 
+/*
+    int2 idx1 = int2(4*id.x, id.y);
+    int2 idx2 = int2(4*id.x+1, id.y);
+    int2 idx3 = int2(4*id.x+2, id.y);
+    int2 idx4 = int2(4*id.x+3, id.y);
+    Result[idx1] = float4(idx1*0.001,0,1);
+    Result[idx2] = float4(idx2*0.001,0,1);
+    Result[idx3] = float4(idx3*0.001,0,1);
+    Result[idx4] = float4(idx4*0.001,0,1);*/
+
+    /*Result[int2(4*id.x, id.y)] = float4(1,0,0,1);
+    Result[int2(4*id.x+1, id.y)] = float4(0,1,0,1);
+    Result[int2(4*id.x+2, id.y)] = float4(0,0,1,1);
+    Result[int2(4*id.x+3, id.y)] = float4(1,1,0,1);*/
+    
+}
