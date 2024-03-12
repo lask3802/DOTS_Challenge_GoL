@@ -10,6 +10,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
+
 namespace LASK.GoL.CompressBits
 {
     public class GoLSimulator : MonoBehaviour
@@ -28,6 +29,8 @@ namespace LASK.GoL.CompressBits
         public bool isPaused = false;
 
         public JobHandle jobHandle;
+        
+        public event Action<uint2> OnGridChanged;
 
         // Start is called before the first frame update
         void Start()
@@ -97,6 +100,28 @@ namespace LASK.GoL.CompressBits
         {
             gridBack.Dispose();
             gridFront.Dispose();
+        }
+
+        public void ResetGrid(uint newGridSize)
+        {
+            gridBack.Dispose();
+            gridFront.Dispose();
+            gridSize = new uint2(newGridSize, newGridSize);
+            gridBack = new NativeArray<GoLCells>((int)gridSize.x * (int)gridSize.y / 64, Allocator.Persistent);
+            gridFront = new NativeArray<GoLCells>((int)gridSize.x * (int)gridSize.y / 64, Allocator.Persistent);
+            var rand = Random.CreateFromIndex(123);
+            for (int i = 0; i < gridBack.Length; i++)
+            {
+                var nextUInt = rand.NextUInt2();
+                var val = (ulong)nextUInt.x | (((ulong)nextUInt.y) << 32);
+                gridBack[i] = new GoLCells
+                {
+                    cells = val
+                };
+            }
+            Tick = 0;
+            OnGridChanged?.Invoke(gridSize);
+            isPaused = false;
         }
     }
 
@@ -170,17 +195,9 @@ namespace LASK.GoL.CompressBits
             var bitIdx = x % 64;
             var cellIdx = (int)((y * dim.x + x) / 64);
             var mask = 1ul << (int)bitIdx;
-            /*
-            if (value)
-            {
-                cells[cellIdx] |= mask;
-            }
-            else
-            {
-                cells[cellIdx] &= ~mask;
-            }*/
-            ulong trueValue = cells[cellIdx] | mask; // 如果要設置位，則進行 OR 運算。
-            ulong falseValue = cells[cellIdx] & ~mask; // 如果要清除位，則進行 AND 運算。
+            
+            ulong trueValue = cells[cellIdx] | mask; 
+            ulong falseValue = cells[cellIdx] & ~mask; 
             cells[cellIdx] = value ? trueValue : falseValue;
         }
     }
@@ -226,10 +243,9 @@ namespace LASK.GoL.CompressBits
                 var neighbors = X86.Popcnt.popcnt_u64(n & (maskNs << (i - 1))) +
                                 X86.Popcnt.popcnt_u64(s & (maskNs << (i - 1))) +
                                 X86.Popcnt.popcnt_u64((maskCell << (i - 1)) & cell);
-
+            
                 ulong mask = 1ul << i;
                 bool isSet = (grid[index].cells & mask) > 0;
-
                 ulong result = (isSet ? ((neighbors >> 1) == 1 ? mask : 0) : (neighbors - 3 == 0 ? mask : 0));
                 // if(IsLogIndex(index))
                 // {
