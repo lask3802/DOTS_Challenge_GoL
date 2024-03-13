@@ -19,7 +19,8 @@ namespace LASK.GoL.CompressBits
 
         private void OnEnable()
         {
-            renderTexture = new RenderTexture((int)simulator.gridSize.x, (int)simulator.gridSize.y,0, RenderTextureFormat.ARGB32)
+            //Low VRAM video card friendly RT
+            renderTexture = new RenderTexture((int)simulator.gridSize.x, (int)simulator.gridSize.y,0, RenderTextureFormat.R8)
             {
                 enableRandomWrite = true,
                 filterMode = FilterMode.Point
@@ -65,7 +66,8 @@ namespace LASK.GoL.CompressBits
             golData.EndWrite<uint2>(bufferSize);
             
             shader.SetBuffer(0, GoLData, golData);
-            shader.Dispatch(kernel, maxRowSize, renderTexture.height, 1);
+            //Each thread group will rendering 64x64 cells which is the minimal size limits of the grid
+            shader.Dispatch(kernel, maxRowSize, renderTexture.height/64, 1);
             
         }
         

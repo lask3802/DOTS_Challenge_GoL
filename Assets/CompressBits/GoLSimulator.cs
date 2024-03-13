@@ -2,11 +2,13 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Unity.Profiling;
 using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
@@ -24,14 +26,20 @@ namespace LASK.GoL.CompressBits
 
         public uint Tick = 0;
         public float TickTime = 0.5f;
-
         private float tickTimer = 0;
         public bool isPaused = false;
-
-        public JobHandle jobHandle;
         
         public event Action<uint2> OnGridChanged;
 
+        public enum Implementation
+        {
+            FirstAttempt,
+            SecondAttempt,
+            FoneE
+        }
+        
+        public Implementation currentImplementation = Implementation.SecondAttempt;
+        
         // Start is called before the first frame update
         void Start()
         {
@@ -42,7 +50,7 @@ namespace LASK.GoL.CompressBits
             for (int i = 0; i < gridBack.Length; i++)
             {
                 var nextUInt = rand.NextUInt2();
-                
+
                 var val = (ulong)nextUInt.x | (((ulong)nextUInt.y) << 32);
                 gridBack[i] = new GoLCells
                 {
@@ -51,30 +59,7 @@ namespace LASK.GoL.CompressBits
             }
         }
 
-        private void SetDebugSquare()
-        {
-            gridBack[16 * 512 + 8] = new GoLCells { cells = 0x7 };
-            gridBack[16 * 513 + 8] = new GoLCells { cells = 0x5 };
-            gridBack[16 * 514 + 8] = new GoLCells { cells = 0x7 };
-        }
-
-        void SetBit(NativeArray<GoLCells> arr, int2 coord, uint2 gridSize, bool value)
-        {
-            var idx = coord.y * gridSize.x + coord.x;
-            var cell = arr[(int)idx / 64];
-            var bit = 1ul << (int)idx % 64;
-            if (value)
-            {
-                cell.cells |= bit;
-            }
-            else
-            {
-                cell.cells &= ~bit;
-            }
-
-            arr[(int)idx / 64] = cell;
-        }
-
+        
         // Update is called once per frame
         void Update()
         {
@@ -85,15 +70,21 @@ namespace LASK.GoL.CompressBits
             tickTimer = TickTime;
 
             Tick++;
-            var job = new NextGenerationJob
+            
+            switch (currentImplementation)
             {
-                grid = Tick % 2 == 1 ? gridBack : gridFront,
-                nextGrid = Tick % 2 == 1 ? gridFront : gridBack,
-                gridSize = gridSize,
-                gridSizeInCompressed = new uint2((uint)gridSize.x / 64, (uint)gridSize.y)
-            };
-            //job.ScheduleParallel(gridFront.Length, math.min(1024, (int)gridSize.x),default).Complete();
-            job.Schedule(gridFront.Length, (int)gridSize.y).Complete();
+                case Implementation.FirstAttempt:
+                    FirstAttempt();
+                    break;
+                case Implementation.SecondAttempt:
+                    SecondAttempt();
+                    break;
+                case Implementation.FoneE:
+                    FoneE();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
 
         private void OnDestroy()
@@ -119,11 +110,85 @@ namespace LASK.GoL.CompressBits
                     cells = val
                 };
             }
+
             Tick = 0;
             OnGridChanged?.Invoke(gridSize);
             isPaused = false;
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void FirstAttempt()
+        {
+            var job = new FirstAttemptJob
+            {
+                grid = Tick % 2 == 1 ? gridBack : gridFront,
+                nextGrid = Tick % 2 == 1 ? gridFront : gridBack,
+                gridSize = gridSize,
+                gridSizeInCompressed = new uint2((uint)gridSize.x / 64, (uint)gridSize.y),
+                
+            };
+            job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+        }
+
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void SecondAttempt()
+        {
+            var job = new SecondAttemptJob
+            {
+                grid = Tick % 2 == 1 ? gridBack : gridFront,
+                nextGrid = Tick % 2 == 1 ? gridFront : gridBack,
+                gridSize = gridSize,
+                gridSizeInCompressed = new uint2((uint)gridSize.x / 64, (uint)gridSize.y),
+                neighborMarker = new ProfilerMarker("NeighbourCounting"),
+                aliveMarker = new ProfilerMarker("AliveCounting")
+            };
+            job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void FoneE()
+        {
+            var job = new FoneEConway.UpdateGridJobBatch
+            {
+                ArrayElementWidth = (int)gridSize.x / 64,
+                ArrayElementHeight = (int)gridSize.y,
+                ArrayElemetCount = (int)gridSize.x * (int)gridSize.y / 64,
+                BaseGrid = Tick % 2 == 1 ? gridBack.Reinterpret<ulong>() : gridFront.Reinterpret<ulong>(),
+                NewGrid = Tick % 2 == 1 ? gridFront.Reinterpret<ulong>() : gridBack.Reinterpret<ulong>(),
+            };
+            job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+        }
+
+        
+        private void SetDebugSquare()
+        {
+            gridBack[16 * 512 + 8] = new GoLCells { cells = 0x7 };
+            gridBack[16 * 513 + 8] = new GoLCells { cells = 0x5 };
+            gridBack[16 * 514 + 8] = new GoLCells { cells = 0x7 };
+        }
+
+        void SetBit(NativeArray<GoLCells> arr, int2 coord, uint2 gridSize, bool value)
+        {
+            var idx = coord.y * gridSize.x + coord.x;
+            var cell = arr[(int)idx / 64];
+            var bit = 1ul << (int)idx % 64;
+            if (value)
+            {
+                cell.cells |= bit;
+            }
+            else
+            {
+                cell.cells &= ~bit;
+            }
+
+            arr[(int)idx / 64] = cell;
+        }
+
+
     }
+    
+    
 
     public partial struct GoLCells
     {
@@ -195,15 +260,15 @@ namespace LASK.GoL.CompressBits
             var bitIdx = x % 64;
             var cellIdx = (int)((y * dim.x + x) / 64);
             var mask = 1ul << (int)bitIdx;
-            
-            ulong trueValue = cells[cellIdx] | mask; 
-            ulong falseValue = cells[cellIdx] & ~mask; 
+
+            ulong trueValue = cells[cellIdx] | mask;
+            ulong falseValue = cells[cellIdx] & ~mask;
             cells[cellIdx] = value ? trueValue : falseValue;
         }
     }
 
     [BurstCompile]
-    public partial struct NextGenerationJob : IJobParallelFor
+    public partial struct FirstAttemptJob : IJobParallelFor
     {
         [NativeDisableUnsafePtrRestriction] [ReadOnly]
         public NativeArray<GoLCells> grid;
@@ -222,11 +287,6 @@ namespace LASK.GoL.CompressBits
         [BurstCompile]
         public void Execute(int index)
         {
-            // if (IsLogIndex(index))
-            // {
-            //     Debug.Log($"index: {index}, n: {n}, s: {s}, ne: {ne}, e: {e}, se: {se}, nw: {nw}, w: {w}, sw: {sw}");
-            // }
-
             const ulong maskNs = 0x7;
             const ulong maskCell = 0x5;
             ulong val = 0;
@@ -237,20 +297,20 @@ namespace LASK.GoL.CompressBits
 
             //Iterate over second to second last bit of the value
             if (!X86.Popcnt.IsPopcntSupported) return;
+
+
+            //internal cells in ulong
             for (int i = 1; i < 63; i++)
             {
                 //cool low level intrinsics for counting neighbors
                 var neighbors = X86.Popcnt.popcnt_u64(n & (maskNs << (i - 1))) +
                                 X86.Popcnt.popcnt_u64(s & (maskNs << (i - 1))) +
                                 X86.Popcnt.popcnt_u64((maskCell << (i - 1)) & cell);
-            
+
                 ulong mask = 1ul << i;
                 bool isSet = (grid[index].cells & mask) > 0;
                 ulong result = (isSet ? ((neighbors >> 1) == 1 ? mask : 0) : (neighbors - 3 == 0 ? mask : 0));
-                // if(IsLogIndex(index))
-                // {
-                //     Debug.Log($"index: {index}, i: {i}, cnt: {neighbors}, isSet: {isSet}, result: {result}");
-                // }
+
                 val |= result;
             }
 
@@ -273,31 +333,493 @@ namespace LASK.GoL.CompressBits
                 ? 0
                 : (grid[index + (int)gridSizeInCompressed.x - 1].cells & 0x8000000000000000) >> 63;
 
+            //Edge cases
             var rightMostNeighbor = ne + e + se + (ulong)X86.Popcnt.popcnt_u64(n & (maskNs << 62)) +
                                     (ulong)X86.Popcnt.popcnt_u64(s & (maskNs << 62)) +
                                     ((cell & 0x4000000000000000) >> 62);
             var setVal = (grid[index].cells & (1ul << 63)) != 0
-                ?
-                rightMostNeighbor == 2 || rightMostNeighbor == 3 ? 1ul << 63 : 0
+                ? rightMostNeighbor == 2 || rightMostNeighbor == 3 ? 1ul << 63 : 0
                 : rightMostNeighbor == 3
                     ? 1ul << 63
                     : 0;
             val |= setVal;
-            // if (IsLogIndex(index))
-            // {
-            //     Debug.Log($"index: {index}, rightMostNeighbor: {rightMostNeighbor}, val: {val}");
-            // }
 
             var leftMostNeighbor = nw + w + sw + (ulong)X86.Popcnt.popcnt_u64(n & 3) +
                                    (ulong)X86.Popcnt.popcnt_u64(s & 3) + ((cell & 2) >> 1);
             setVal = (grid[index].cells & 1ul) != 0 ? leftMostNeighbor == 2 || leftMostNeighbor == 3 ? 1ul : 0 :
                 leftMostNeighbor == 3 ? 1ul : 0;
             val |= setVal;
-            // if (IsLogIndex(index))
-            // {
-            //    Debug.Log($"index: {index}, leftMostNeighbor: {leftMostNeighbor}, val: {val}");
-            // }
+
             nextGrid[index] = new GoLCells { cells = val };
+        }
+    }
+
+    [BurstCompile]
+    public partial struct SecondAttemptJob : IJobParallelForBatch
+    {
+        [NativeDisableUnsafePtrRestriction] [ReadOnly]
+        public NativeArray<GoLCells> grid;
+
+        [WriteOnly] public NativeArray<GoLCells> nextGrid;
+        [ReadOnly] public uint2 gridSize;
+        [ReadOnly] public uint2 gridSizeInCompressed;
+
+        public ProfilerMarker neighborMarker;
+        public ProfilerMarker aliveMarker;
+
+        private bool IsLogIndex(int index)
+        {
+            return index is >= 16 * 512 + 7 and <= 16 * 512 + 9 ||
+                   index is >= 16 * 513 + 7 and <= 16 * 513 + 9 ||
+                   index is >= 16 * 514 + 7 and <= 16 * 514 + 9;
+        }
+
+        [BurstCompile]
+        public unsafe void Execute(int startIndex, int count)
+        {
+            const ulong maskNs = 0x7;
+            const ulong maskCell = 0x5;
+
+            //Neighbor array helps vectorized counting neighbors
+            //this way is much fast then in-place alive check
+            //inspired from FoneE's implementation
+            var neighbors = stackalloc byte[64];
+
+            for (int idx = 0; idx < count; idx++)
+            {
+                var val = 0ul;
+                var index = startIndex + idx;
+
+                var cell = grid[index].cells;
+
+                //CPU without SSE4 support will not be able to run this job
+                if (!X86.Popcnt.IsPopcntSupported) return;
+
+
+                //Edge case might not occurs frequently, tag it as unlikely will improve about 5% performance
+                //Access memory as sequential as possible
+
+                var e = Hint.Unlikely(index % gridSizeInCompressed.x == gridSizeInCompressed.x - 1)
+                    ? 0
+                    : grid[index + 1].cells & 1;
+                var w = Hint.Unlikely(index % gridSizeInCompressed.x == 0)
+                    ? 0
+                    : (grid[index - 1].cells & 0x8000000000000000) >> 63;
+
+                var ne = Hint.Unlikely(index % gridSizeInCompressed.x == gridSizeInCompressed.x - 1 ||
+                                       index - gridSizeInCompressed.x < 0)
+                    ? 0
+                    : (grid[index - (int)gridSizeInCompressed.x + 1].cells) & 1;
+                var n = Hint.Unlikely(index - gridSizeInCompressed.x < 0)
+                    ? 0
+                    : grid[index - (int)gridSizeInCompressed.x].cells;
+                var nw = Hint.Unlikely(index % gridSizeInCompressed.x == 0 || index - gridSizeInCompressed.x < 0)
+                    ? 0
+                    : (grid[index - (int)gridSizeInCompressed.x - 1].cells & 0x8000000000000000) >> 63;
+
+
+                var se = Hint.Unlikely(index % gridSizeInCompressed.x == gridSizeInCompressed.x - 1 ||
+                                       index + gridSizeInCompressed.x >= grid.Length)
+                    ? 0
+                    : grid[index + (int)gridSizeInCompressed.x + 1].cells & 1;
+                var s = Hint.Unlikely(index + gridSizeInCompressed.x >= grid.Length)
+                    ? 0
+                    : grid[index + (int)gridSizeInCompressed.x].cells;
+                var sw = Hint.Unlikely(index % gridSizeInCompressed.x == 0 ||
+                                       index + gridSizeInCompressed.x >= grid.Length)
+                    ? 0
+                    : (grid[index + (int)gridSizeInCompressed.x - 1].cells & 0x8000000000000000) >> 63;
+
+
+                //Here is how huge improvement comes from, we try let compiler generate more vectorization code.
+                //It's important that access memory as sequential as possible,
+                //in previous implementation I process edge case first then process internal cells,
+                //but after change order, performance improved about 80%, that's huge,
+                //it's seem Burst generate more efficient assembly code, not only the cache friendly access,
+                //but I'm not sure about this, need to investigate assembly more.
+                neighbors[0] = (byte)(nw + w + sw + (ulong)X86.Popcnt.popcnt_u64(n & 3) +
+                                      (ulong)X86.Popcnt.popcnt_u64(s & 3) + ((cell & 2) >> 1));
+                for (int i = 1; i < 63; i++)
+                {
+                    //cool low level intrinsics for counting neighbors
+                    neighbors[i] = (byte)(X86.Popcnt.popcnt_u64(n & (maskNs << (i - 1))) +
+                                          X86.Popcnt.popcnt_u64(s & (maskNs << (i - 1))) +
+                                          X86.Popcnt.popcnt_u64((maskCell << (i - 1)) & cell));
+                }
+
+                neighbors[63] = (byte)(ne + e + se + (ulong)X86.Popcnt.popcnt_u64(n & (maskNs << 62)) +
+                                       (ulong)X86.Popcnt.popcnt_u64(s & (maskNs << 62)) +
+                                       ((cell & 0x4000000000000000) >> 62));
+
+                //Almost fully vectorized by Burst. inspired from FoneE's implementation
+                for (int i = 0; i < 64; i++)
+                {
+                    //ulong mask = 1ul << i;
+                    bool isSet = (cell & (1ul << i)) > 0;
+                    if (isSet)
+                    {
+                        bool isAlive = neighbors[i] == 2 || neighbors[i] == 3;
+                        val |= isAlive ? (1ul << i) : 0;
+                    }
+                    else
+                    {
+                        bool isAlive = neighbors[i] == 3;
+                        val |= isAlive ? (1ul << i) : 0;
+                    }
+                }
+
+                nextGrid[index] = new GoLCells { cells = val };
+                UnsafeUtility.MemClear(neighbors, 64);
+            }
+        }
+    }
+
+
+    //FoneE's implementation
+    //https://github.com/OfficialFoneE/DOTS-Conway/blob/e77566e5a7c1835257f08e2e5ae0a2869e46ba03/Assets/Scripts/Conway.Jobs.cs
+
+    public partial struct FoneEConway
+    {
+        [BurstCompile]
+        public struct UpdateGridJobBatch : IJobParallelForBatch
+        {
+            public int ArrayElementWidth;
+            public int ArrayElementHeight;
+            public int ArrayElemetCount;
+
+            [ReadOnly] public NativeArray<ulong> BaseGrid;
+            [WriteOnly] public NativeArray<ulong> NewGrid;
+
+            public unsafe void Execute(int startIndex, int count)
+            {
+                var neighborCounts = stackalloc byte[64];
+
+                int startX = startIndex % ArrayElementWidth;
+                int startY = startIndex / ArrayElementWidth;
+
+                int x = startX;
+                int y = startY;
+
+                for (int index = 0; index < count; index++)
+                {
+                    int currentIndex = startIndex + index;
+
+                    ulong baseCells = BaseGrid[currentIndex];
+
+                    bool isLeft = x - 1 >= 0;
+                    bool isRight = x + 1 < ArrayElementWidth;
+                    bool isTop = y + 1 < ArrayElementHeight;
+                    bool isBottom = y - 1 >= 0;
+
+                    var topIndex = currentIndex + ArrayElementWidth;
+                    var bottomIndex = currentIndex - ArrayElementWidth;
+                    var leftIndex = currentIndex - 1;
+                    var rightIndex = currentIndex + 1;
+
+                    var leftTopIndex = topIndex - 1;
+                    var rightTopIndex = topIndex + 1;
+                    var leftBottomIndex = bottomIndex - 1;
+                    var rightBottomIndex = bottomIndex + 1;
+
+                    neighborCounts[0] += GetBitValue(baseCells, 1);
+
+                    // If there are cells to the left of this chunk.
+                    if (Hint.Likely(isLeft))
+                    {
+                        neighborCounts[0] += GetBitValue(BaseGrid[leftIndex], 63);
+
+                        // If there are cells to the bottom left of this chunk
+                        if (Hint.Likely(isBottom))
+                        {
+                            neighborCounts[0] += GetBitValue(BaseGrid[leftBottomIndex], 63);
+                        }
+
+                        // If there are cells to the top left of this chunk
+                        if (Hint.Likely(isTop))
+                        {
+                            neighborCounts[0] += GetBitValue(BaseGrid[leftTopIndex], 63);
+                        }
+                    }
+
+                    neighborCounts[63] += GetBitValue(baseCells, 62);
+
+                    // If there are cells to the right of this chunk.
+                    if (Hint.Likely(isRight))
+                    {
+                        neighborCounts[63] += GetBitValue(BaseGrid[rightIndex], 0);
+
+                        // If there are cells to the bottom right of this chunk
+                        if (Hint.Likely(isBottom))
+                        {
+                            neighborCounts[63] += GetBitValue(BaseGrid[rightBottomIndex], 0);
+                        }
+
+                        // If there are cells to the top right of this chunk
+                        if (Hint.Likely(isTop))
+                        {
+                            neighborCounts[63] += GetBitValue(BaseGrid[rightTopIndex], 0);
+                        }
+                    }
+
+                    // Left and right internal.
+                    {
+                        for (int i = 1; i < 64 - 1; i += 2)
+                        {
+                            bool isCenterEnabled = IsBitEnabled(baseCells, i);
+                            bool isLeftEnabled = IsBitEnabled(baseCells, i - 1);
+                            bool isRightEnabled = IsBitEnabled(baseCells, i + 1);
+
+                            neighborCounts[i - 1] += isCenterEnabled ? (byte)1 : (byte)0;
+                            neighborCounts[i + 1] += isCenterEnabled ? (byte)1 : (byte)0;
+                            neighborCounts[i] += isLeftEnabled ? (byte)1 : (byte)0;
+                            neighborCounts[i] += isRightEnabled ? (byte)1 : (byte)0;
+                        }
+                    }
+
+                    if (Hint.Likely(isTop))
+                    {
+                        ulong top = BaseGrid[topIndex];
+
+                        neighborCounts[0] += GetBitValue(top, 1);
+                        neighborCounts[63] += GetBitValue(top, 62);
+
+                        // The direct top.
+                        for (int i = 0; i < 64; i++)
+                        {
+                            neighborCounts[i] += ((top >> i) & 1) == 1 ? (byte)1 : (byte)0;
+                        }
+
+                        // The diagonals.
+                        for (int i = 1; i < 64 - 1; i++)
+                        {
+                            neighborCounts[i] += ((top >> (i - 1)) & 1) == 1 ? (byte)1 : (byte)0;
+                            neighborCounts[i] += ((top >> (i + 1)) & 1) == 1 ? (byte)1 : (byte)0;
+                        }
+                    }
+
+                    if (Hint.Likely(isBottom))
+                    {
+                        ulong bottom = BaseGrid[bottomIndex];
+
+                        neighborCounts[0] += GetBitValue(bottom, 1);
+                        neighborCounts[63] += GetBitValue(bottom, 62);
+
+                        for (int i = 0; i < 64; i++)
+                        {
+                            neighborCounts[i] += ((bottom >> i) & 1) == 1 ? (byte)1 : (byte)0;
+                        }
+
+                        for (int i = 1; i < 64 - 1; i++)
+                        {
+                            neighborCounts[i] += ((bottom >> (i - 1)) & 1) == 1 ? (byte)1 : (byte)0;
+                            neighborCounts[i] += ((bottom >> (i + 1)) & 1) == 1 ? (byte)1 : (byte)0;
+                        }
+                    }
+
+                    ulong results = 0;
+
+                    for (int i = 0; i < 64; i++)
+                    {
+                        bool isCellAlive = IsBitEnabled(baseCells, i);
+
+                        if (isCellAlive)
+                        {
+                            bool isAlive = neighborCounts[i] == 2 | neighborCounts[i] == 3;
+
+                            results |= (isAlive ? 1UL : 0UL) << i;
+                        }
+                        else
+                        {
+                            bool isAlive = neighborCounts[i] == 3;
+
+                            results |= (isAlive ? 1UL : 0UL) << i;
+                        }
+                    }
+
+                    NewGrid[currentIndex] = results;
+
+                    x++;
+                    if (x >= ArrayElementWidth)
+                    {
+                        y++;
+                        x = 0;
+                    }
+
+                    UnsafeUtility.MemClear(neighborCounts, UnsafeUtility.SizeOf<byte>() * 64);
+                }
+            }
+
+            public unsafe void Execute(int index)
+            {
+                var neighborCounts = stackalloc byte[64];
+
+                ulong baseCells = BaseGrid[index];
+
+                int x = index % ArrayElementWidth;
+                int y = index / ArrayElementWidth;
+
+                bool isLeft = x - 1 >= 0;
+                bool isRight = x + 1 < ArrayElementWidth;
+                bool isTop = y + 1 < ArrayElementHeight;
+                bool isBottom = y - 1 >= 0;
+
+                var topIndex = index + ArrayElementWidth;
+                var bottomIndex = index - ArrayElementWidth;
+                var leftIndex = index - 1;
+                var rightIndex = index + 1;
+
+                var leftTopIndex = topIndex - 1;
+                var rightTopIndex = topIndex + 1;
+                var leftBottomIndex = bottomIndex - 1;
+                var rightBottomIndex = bottomIndex + 1;
+
+                neighborCounts[0] += GetBitValue(baseCells, 1);
+
+                // If there are cells to the left of this chunk.
+                if (isLeft)
+                {
+                    neighborCounts[0] += GetBitValue(BaseGrid[leftIndex], 63);
+
+                    // If there are cells to the bottom left of this chunk
+                    if (isBottom)
+                    {
+                        neighborCounts[0] += GetBitValue(BaseGrid[leftBottomIndex], 63);
+                    }
+
+                    // If there are cells to the top left of this chunk
+                    if (isTop)
+                    {
+                        neighborCounts[0] += GetBitValue(BaseGrid[leftTopIndex], 63);
+                    }
+                }
+
+                neighborCounts[63] += GetBitValue(baseCells, 62);
+
+                // If there are cells to the right of this chunk.
+                if (isRight)
+                {
+                    neighborCounts[63] += GetBitValue(BaseGrid[rightIndex], 0);
+
+                    // If there are cells to the bottom right of this chunk
+                    if (isBottom)
+                    {
+                        neighborCounts[63] += GetBitValue(BaseGrid[rightBottomIndex], 0);
+                    }
+
+                    // If there are cells to the top right of this chunk
+                    if (isTop)
+                    {
+                        neighborCounts[63] += GetBitValue(BaseGrid[rightTopIndex], 0);
+                    }
+                }
+
+                // Left and right internal.
+                {
+                    for (int i = 1; i < 64 - 1; i += 2)
+                    {
+                        bool isCenterEnabled = IsBitEnabled(baseCells, i);
+                        bool isLeftEnabled = IsBitEnabled(baseCells, i - 1);
+                        bool isRightEnabled = IsBitEnabled(baseCells, i + 1);
+
+                        neighborCounts[i - 1] += isCenterEnabled ? (byte)1 : (byte)0;
+                        neighborCounts[i + 1] += isCenterEnabled ? (byte)1 : (byte)0;
+                        neighborCounts[i] += isLeftEnabled ? (byte)1 : (byte)0;
+                        neighborCounts[i] += isRightEnabled ? (byte)1 : (byte)0;
+                    }
+                }
+
+                if (isTop)
+                {
+                    ulong top = BaseGrid[topIndex];
+
+                    neighborCounts[0] += GetBitValue(top, 1);
+                    neighborCounts[63] += GetBitValue(top, 62);
+
+                    // The direct top.
+                    for (int i = 0; i < 64; i++)
+                    {
+                        neighborCounts[i] += ((top >> i) & 1) == 1 ? (byte)1 : (byte)0;
+                    }
+
+                    // The diagonals.
+                    for (int i = 1; i < 64 - 1; i++)
+                    {
+                        neighborCounts[i] += ((top >> (i - 1)) & 1) == 1 ? (byte)1 : (byte)0;
+                        neighborCounts[i] += ((top >> (i + 1)) & 1) == 1 ? (byte)1 : (byte)0;
+                    }
+                }
+
+                if (isBottom)
+                {
+                    ulong bottom = BaseGrid[bottomIndex];
+
+                    neighborCounts[0] += GetBitValue(bottom, 1);
+                    neighborCounts[63] += GetBitValue(bottom, 62);
+
+                    for (int i = 0; i < 64; i++)
+                    {
+                        neighborCounts[i] += ((bottom >> i) & 1) == 1 ? (byte)1 : (byte)0;
+                    }
+
+                    for (int i = 1; i < 64 - 1; i++)
+                    {
+                        neighborCounts[i] += ((bottom >> (i - 1)) & 1) == 1 ? (byte)1 : (byte)0;
+                        neighborCounts[i] += ((bottom >> (i + 1)) & 1) == 1 ? (byte)1 : (byte)0;
+                    }
+                }
+
+                ulong results = 0;
+
+                for (int i = 0; i < 64; i++)
+                {
+                    bool isCellAlive = IsBitEnabled(baseCells, i);
+
+                    if (isCellAlive)
+                    {
+                        bool isAlive = neighborCounts[i] == 2 | neighborCounts[i] == 3;
+
+                        results |= (isAlive ? 1UL : 0UL) << i;
+                    }
+                    else
+                    {
+                        bool isAlive = neighborCounts[i] == 3;
+
+                        results |= (isAlive ? 1UL : 0UL) << i;
+                    }
+                }
+
+                NewGrid[index] = results;
+
+                //v128 top = new v128();
+                //v128 bottom = new v128();
+                //v128 center = new v128();
+                //v128 left = new v128();
+                //v128 right = new v128();
+
+                //tmp = (input ^ (input >> 8)) & 0x0000ff00;
+                //input ^= (tmp ^ (tmp << 8));
+                //tmp = (input ^ (input >> 4)) & 0x00f000f0;
+                //input ^= (tmp ^ (tmp << 4));
+                //tmp = (input ^ (input >> 2)) & 0x0c0c0c0c;
+                //input ^= (tmp ^ (tmp << 2));
+                //tmp = (input ^ (input >> 1)) & 0x22222222;
+                //input ^= (tmp ^ (tmp << 1));
+
+                // Maybe we do 64 x 64 chunks.
+                // Than calculate the alive for the bounding chunks?
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static bool IsBitEnabled(ulong value, int index)
+            {
+                return ((value >> index) & 1) == 1;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static byte GetBitValue(ulong value, int index)
+            {
+                return IsBitEnabled(value, index) ? (byte)1 : (byte)0;
+            }
         }
     }
 }
