@@ -1,0 +1,114 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+
+int ArrayElementWidth;
+int ArrayElementHeight;
+
+float CellSize;
+float2 CameraBoundsMin;
+float2 CameraBoundsMax;
+
+StructuredBuffer<uint2> GridCellDataBuffer;
+RWTexture2D<float> GridCellDrawTexture;
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    uint2 cells = GridCellDataBuffer[id.x+id.y*ArrayElementWidth];
+    
+    
+    uint2 cellIndex = uint2(id.x * 8, id.y * 8);
+    /*[unroll]
+    for(int j = 0; j < 4; j++)
+    {
+        [unroll]
+        for(int i = 0; i < 8; i++)
+        {
+            GridCellDrawTexture[cellIndex + uint2(i, j)] = (cells.x >> (i + j * 8)) & 1;
+        }       
+    }
+
+    [unroll]
+    for(int j2 = 4; j2 < 8; j2++)
+    {
+        [unroll]
+        for(int i = 0; i < 8; i++)
+        {
+            GridCellDrawTexture[cellIndex + uint2(i, j2)] = (cells.y >> (i + j2 * 8)) & 1;
+        }       
+    }*/
+    GridCellDrawTexture[cellIndex + uint2(0, 0)] = (cells.x >> 0) & 1;
+        GridCellDrawTexture[cellIndex + uint2(1, 0)] = (cells.x >> 1) & 1;
+        GridCellDrawTexture[cellIndex + uint2(2, 0)] = (cells.x >> 2) & 1;
+        GridCellDrawTexture[cellIndex + uint2(3, 0)] = (cells.x >> 3) & 1;
+        GridCellDrawTexture[cellIndex + uint2(4, 0)] = (cells.x >> 4) & 1;
+        GridCellDrawTexture[cellIndex + uint2(5, 0)] = (cells.x >> 5) & 1;
+        GridCellDrawTexture[cellIndex + uint2(6, 0)] = (cells.x >> 6) & 1;
+        GridCellDrawTexture[cellIndex + uint2(7, 0)] = (cells.x >> 7) & 1;
+    
+        GridCellDrawTexture[cellIndex + uint2(0, 1)] = (cells.x >> 8) & 1;
+        GridCellDrawTexture[cellIndex + uint2(1, 1)] = (cells.x >> 9) & 1;
+        GridCellDrawTexture[cellIndex + uint2(2, 1)] = (cells.x >> 10) & 1;
+        GridCellDrawTexture[cellIndex + uint2(3, 1)] = (cells.x >> 11) & 1;
+        GridCellDrawTexture[cellIndex + uint2(4, 1)] = (cells.x >> 12) & 1;
+        GridCellDrawTexture[cellIndex + uint2(5, 1)] = (cells.x >> 13) & 1;
+        GridCellDrawTexture[cellIndex + uint2(6, 1)] = (cells.x >> 14) & 1;
+        GridCellDrawTexture[cellIndex + uint2(7, 1)] = (cells.x >> 15) & 1;
+    
+        GridCellDrawTexture[cellIndex + uint2(0, 2)] = (cells.x >> 16) & 1;
+        GridCellDrawTexture[cellIndex + uint2(1, 2)] = (cells.x >> 17) & 1;
+        GridCellDrawTexture[cellIndex + uint2(2, 2)] = (cells.x >> 18) & 1;
+        GridCellDrawTexture[cellIndex + uint2(3, 2)] = (cells.x >> 19) & 1;
+        GridCellDrawTexture[cellIndex + uint2(4, 2)] = (cells.x >> 20) & 1;
+        GridCellDrawTexture[cellIndex + uint2(5, 2)] = (cells.x >> 21) & 1;
+        GridCellDrawTexture[cellIndex + uint2(6, 2)] = (cells.x >> 22) & 1;
+        GridCellDrawTexture[cellIndex + uint2(7, 2)] = (cells.x >> 23) & 1;
+    
+        GridCellDrawTexture[cellIndex + uint2(0, 3)] = (cells.x >> 24) & 1;
+        GridCellDrawTexture[cellIndex + uint2(1, 3)] = (cells.x >> 25) & 1;
+        GridCellDrawTexture[cellIndex + uint2(2, 3)] = (cells.x >> 26) & 1;
+        GridCellDrawTexture[cellIndex + uint2(3, 3)] = (cells.x >> 27) & 1;
+        GridCellDrawTexture[cellIndex + uint2(4, 3)] = (cells.x >> 28) & 1;
+        GridCellDrawTexture[cellIndex + uint2(5, 3)] = (cells.x >> 29) & 1;
+        GridCellDrawTexture[cellIndex + uint2(6, 3)] = (cells.x >> 30) & 1;
+        GridCellDrawTexture[cellIndex + uint2(7, 3)] = (cells.x >> 31) & 1;
+    
+        GridCellDrawTexture[cellIndex + uint2(0, 4)] = (cells.y >> 0) & 1;
+        GridCellDrawTexture[cellIndex + uint2(1, 4)] = (cells.y >> 1) & 1;
+        GridCellDrawTexture[cellIndex + uint2(2, 4)] = (cells.y >> 2) & 1;
+        GridCellDrawTexture[cellIndex + uint2(3, 4)] = (cells.y >> 3) & 1;
+        GridCellDrawTexture[cellIndex + uint2(4, 4)] = (cells.y >> 4) & 1;
+        GridCellDrawTexture[cellIndex + uint2(5, 4)] = (cells.y >> 5) & 1;
+        GridCellDrawTexture[cellIndex + uint2(6, 4)] = (cells.y >> 6) & 1;
+        GridCellDrawTexture[cellIndex + uint2(7, 4)] = (cells.y >> 7) & 1;
+    
+        GridCellDrawTexture[cellIndex + uint2(0, 5)] = (cells.y >> 8) & 1;
+        GridCellDrawTexture[cellIndex + uint2(1, 5)] = (cells.y >> 9) & 1;
+        GridCellDrawTexture[cellIndex + uint2(2, 5)] = (cells.y >> 10) & 1;
+        GridCellDrawTexture[cellIndex + uint2(3, 5)] = (cells.y >> 11) & 1;
+        GridCellDrawTexture[cellIndex + uint2(4, 5)] = (cells.y >> 12) & 1;
+        GridCellDrawTexture[cellIndex + uint2(5, 5)] = (cells.y >> 13) & 1;
+        GridCellDrawTexture[cellIndex + uint2(6, 5)] = (cells.y >> 14) & 1;
+        GridCellDrawTexture[cellIndex + uint2(7, 5)] = (cells.y >> 15) & 1;
+                                                                      
+        GridCellDrawTexture[cellIndex + uint2(0, 6)] = (cells.y >> 16) & 1;
+        GridCellDrawTexture[cellIndex + uint2(1, 6)] = (cells.y >> 17) & 1;
+        GridCellDrawTexture[cellIndex + uint2(2, 6)] = (cells.y >> 18) & 1;
+        GridCellDrawTexture[cellIndex + uint2(3, 6)] = (cells.y >> 19) & 1;
+        GridCellDrawTexture[cellIndex + uint2(4, 6)] = (cells.y >> 20) & 1;
+        GridCellDrawTexture[cellIndex + uint2(5, 6)] = (cells.y >> 21) & 1;
+        GridCellDrawTexture[cellIndex + uint2(6, 6)] = (cells.y >> 22) & 1;
+        GridCellDrawTexture[cellIndex + uint2(7, 6)] = (cells.y >> 23) & 1;
+                                                                      
+        GridCellDrawTexture[cellIndex + uint2(0, 7)] = (cells.y >> 24) & 1;
+        GridCellDrawTexture[cellIndex + uint2(1, 7)] = (cells.y >> 25) & 1;
+        GridCellDrawTexture[cellIndex + uint2(2, 7)] = (cells.y >> 26) & 1;
+        GridCellDrawTexture[cellIndex + uint2(3, 7)] = (cells.y >> 27) & 1;
+        GridCellDrawTexture[cellIndex + uint2(4, 7)] = (cells.y >> 28) & 1;
+        GridCellDrawTexture[cellIndex + uint2(5, 7)] = (cells.y >> 29) & 1;
+        GridCellDrawTexture[cellIndex + uint2(6, 7)] = (cells.y >> 30) & 1;
+        GridCellDrawTexture[cellIndex + uint2(7, 7)] = (cells.y >> 31) & 1;
+
+}
+  

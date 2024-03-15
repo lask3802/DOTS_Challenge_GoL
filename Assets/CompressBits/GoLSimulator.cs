@@ -9,6 +9,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Profiling;
+using Unity.VisualScripting;
 using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
@@ -29,37 +30,28 @@ namespace LASK.GoL.CompressBits
         private float tickTimer = 0;
         public bool isPaused = false;
         
+        public bool isDebug = false;
+
         public event Action<uint2> OnGridChanged;
 
         public enum Implementation
         {
             FirstAttempt,
             SecondAttempt,
-            FoneE
+            FoneE,
+            FoneESquare,
+            SquareLayout,
         }
-        
-        public Implementation currentImplementation = Implementation.SecondAttempt;
-        
+
+        public Implementation currentImplementation = Implementation.SquareLayout;
+
         // Start is called before the first frame update
         void Start()
         {
-            gridBack = new NativeArray<GoLCells>((int)gridSize.x * (int)gridSize.y / 64, Allocator.Persistent);
-            gridFront = new NativeArray<GoLCells>((int)gridSize.x * (int)gridSize.y / 64, Allocator.Persistent);
-            var rand = Random.CreateFromIndex(123);
-            //SetDebugSquare();
-            for (int i = 0; i < gridBack.Length; i++)
-            {
-                var nextUInt = rand.NextUInt2();
-
-                var val = (ulong)nextUInt.x | (((ulong)nextUInt.y) << 32);
-                gridBack[i] = new GoLCells
-                {
-                    cells = val
-                };
-            }
+            InitializeGridJob().Complete();
         }
 
-        
+
         // Update is called once per frame
         void Update()
         {
@@ -70,7 +62,7 @@ namespace LASK.GoL.CompressBits
             tickTimer = TickTime;
 
             Tick++;
-            
+
             switch (currentImplementation)
             {
                 case Implementation.FirstAttempt:
@@ -82,9 +74,41 @@ namespace LASK.GoL.CompressBits
                 case Implementation.FoneE:
                     FoneE();
                     break;
+                case Implementation.FoneESquare:
+                    FoneESquare();
+                    break;
+                case Implementation.SquareLayout:
+                    SquareLayout();
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
+        }
+
+        private void SquareLayout()
+        {
+            var job = new LiarJob
+            {
+                grid = Tick % 2 == 1 ? gridBack : gridFront,
+                nextGrid = Tick % 2 == 1 ? gridFront : gridBack,
+                gridSize = gridSize,
+                //batchCnt = 4,
+                gridSizeInCompressed = new int2((int)gridSize.x / 8, (int)gridSize.y /8),
+            };
+            job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+        }
+
+        private void FoneESquare()
+        {
+            var job = new FoneEConway.UpdateGridJobBatchSquare()
+            {
+                ArrayElementWidth = (int)gridSize.x / 8,
+                ArrayElementHeight = (int)gridSize.y / 8,
+                ArrayElemetCount = (int)gridSize.x * (int)gridSize.y / 64,
+                BaseGrid = Tick % 2 == 1 ? gridBack.Reinterpret<ulong>() : gridFront.Reinterpret<ulong>(),
+                NewGrid = Tick % 2 == 1 ? gridFront.Reinterpret<ulong>() : gridBack.Reinterpret<ulong>(),
+            };
+            job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
         }
 
         private void OnDestroy()
@@ -93,44 +117,59 @@ namespace LASK.GoL.CompressBits
             gridFront.Dispose();
         }
 
-        public void ResetGrid(uint newGridSize)
+        public JobHandle ResetGrid(uint newGridSize)
         {
-            gridBack.Dispose();
-            gridFront.Dispose();
             gridSize = new uint2(newGridSize, newGridSize);
-            gridBack = new NativeArray<GoLCells>((int)gridSize.x * (int)gridSize.y / 64, Allocator.Persistent);
-            gridFront = new NativeArray<GoLCells>((int)gridSize.x * (int)gridSize.y / 64, Allocator.Persistent);
-            var rand = Random.CreateFromIndex(123);
-            for (int i = 0; i < gridBack.Length; i++)
-            {
-                var nextUInt = rand.NextUInt2();
-                var val = (ulong)nextUInt.x | (((ulong)nextUInt.y) << 32);
-                gridBack[i] = new GoLCells
-                {
-                    cells = val
-                };
-            }
-
+            var j = InitializeGridJob();
             Tick = 0;
             OnGridChanged?.Invoke(gridSize);
             isPaused = false;
+            return j;
         }
-        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        JobHandle InitializeGridJob()
+        {
+            gridBack.Dispose();
+            gridFront.Dispose();
+            
+            
+            gridBack = new NativeArray<GoLCells>((int)gridSize.x * (int)gridSize.y / 64, Allocator.Persistent,
+                NativeArrayOptions.UninitializedMemory);
+            gridFront = new NativeArray<GoLCells>((int)gridSize.x * (int)gridSize.y / 64, Allocator.Persistent,
+                NativeArrayOptions.UninitializedMemory);
+            if (!isDebug)
+            {
+                var rand = Random.CreateFromIndex((uint)UnityEngine.Random.Range(0, int.MaxValue));
+                var job = new InitializeGridJob
+                {
+                    grid = gridBack,
+                    rand = rand
+                };
+                return job.Schedule(gridBack.Length, default);
+            }
+            else
+            {
+                SetDebugSquare();
+                return default;
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void FirstAttempt()
         {
-            var job = new FirstAttemptJob
+            var job = new FirstAttemptJob()
             {
                 grid = Tick % 2 == 1 ? gridBack : gridFront,
                 nextGrid = Tick % 2 == 1 ? gridFront : gridBack,
                 gridSize = gridSize,
+                //batchCnt = 4,
                 gridSizeInCompressed = new uint2((uint)gridSize.x / 64, (uint)gridSize.y),
-                
             };
             job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
         }
 
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void SecondAttempt()
         {
@@ -160,12 +199,12 @@ namespace LASK.GoL.CompressBits
             job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
         }
 
-        
+
         private void SetDebugSquare()
         {
-            gridBack[16 * 512 + 8] = new GoLCells { cells = 0x7 };
-            gridBack[16 * 513 + 8] = new GoLCells { cells = 0x5 };
-            gridBack[16 * 514 + 8] = new GoLCells { cells = 0x7 };
+            for(var i = 0 ; i < gridBack.Length; i++)
+                gridBack[i] = new GoLCells { cells =0  };
+            gridBack[4+8] = new GoLCells { cells = 0x7| 5<<8 | 7<<16  };
         }
 
         void SetBit(NativeArray<GoLCells> arr, int2 coord, uint2 gridSize, bool value)
@@ -184,11 +223,8 @@ namespace LASK.GoL.CompressBits
 
             arr[(int)idx / 64] = cell;
         }
-
-
     }
-    
-    
+
 
     public partial struct GoLCells
     {
@@ -196,74 +232,20 @@ namespace LASK.GoL.CompressBits
     }
 
     [BurstCompile]
-    public partial struct NextGenerationJobTrival : IJobParallelFor
+    public partial struct InitializeGridJob : IJobFor
     {
-        [NativeDisableUnsafePtrRestriction] [ReadOnly]
-        public NativeArray<GoLCells> grid;
-
-        [NativeDisableUnsafePtrRestriction] public NativeArray<ulong> nextGrid;
-        [ReadOnly] public uint2 gridSize;
+        [WriteOnly] public NativeArray<GoLCells> grid;
+        [ReadOnly] public Random rand;
 
         [BurstCompile]
         public void Execute(int index)
         {
-            //Debug.Log($"index: ${index}");
-
-            for (uint i = 0; i < 64; i++)
+            var nextUInt = rand.NextUInt2();
+            var val = (ulong)nextUInt.x | (((ulong)nextUInt.y) << 32);
+            grid[index] = new GoLCells
             {
-                var coord = ToAbsoluteCoordinate((uint)index, i);
-                var neighbors = CountNeighbors((uint)index, i);
-                var cell = GetCell(ref grid, coord.x, coord.y, gridSize);
-                var isAlive = (cell == 1) ? (neighbors == 2 || neighbors == 3) : (neighbors == 3);
-                SetCell(ref nextGrid, coord.x, coord.y, gridSize, isAlive);
-            }
-        }
-
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int CountNeighbors(uint index, uint bitIndex)
-        {
-            var co = ToAbsoluteCoordinate(index, bitIndex);
-            return GetCell(ref grid, co.x - 1, co.y - 1, gridSize) +
-                   GetCell(ref grid, co.x, co.y - 1, gridSize) +
-                   GetCell(ref grid, co.x + 1, co.y - 1, gridSize) +
-                   GetCell(ref grid, co.x - 1, co.y, gridSize) +
-                   GetCell(ref grid, co.x + 1, co.y, gridSize) +
-                   GetCell(ref grid, co.x - 1, co.y + 1, gridSize) +
-                   GetCell(ref grid, co.x, co.y + 1, gridSize) +
-                   GetCell(ref grid, co.x + 1, co.y + 1, gridSize);
-        }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private uint2 ToAbsoluteCoordinate(uint index, uint bitIndex)
-        {
-            return new uint2(index % (gridSize.x / 64) * 64 + bitIndex, index / (gridSize.x / 64));
-        }
-
-        [BurstCompile]
-        private byte GetCell(ref NativeArray<GoLCells> cells, uint x, uint y, in uint2 dim)
-        {
-            if (x >= dim.x || y >= dim.y)
-                return 0;
-            var bitIdx = x % 64;
-            var cellIdx = (int)((y * dim.x + x) / 64);
-            return (byte)((cells[cellIdx].cells >> (int)bitIdx) & 1);
-        }
-
-        [BurstCompile]
-        private void SetCell(ref NativeArray<ulong> cells, uint x, uint y, in uint2 dim, bool value)
-        {
-            if (x >= dim.x || y >= dim.y)
-                return;
-            var bitIdx = x % 64;
-            var cellIdx = (int)((y * dim.x + x) / 64);
-            var mask = 1ul << (int)bitIdx;
-
-            ulong trueValue = cells[cellIdx] | mask;
-            ulong falseValue = cells[cellIdx] & ~mask;
-            cells[cellIdx] = value ? trueValue : falseValue;
+                cells = val
+            };
         }
     }
 
@@ -354,130 +336,11 @@ namespace LASK.GoL.CompressBits
         }
     }
 
-    [BurstCompile]
-    public partial struct SecondAttemptJob : IJobParallelForBatch
-    {
-        [NativeDisableUnsafePtrRestriction] [ReadOnly]
-        public NativeArray<GoLCells> grid;
-
-        [WriteOnly] public NativeArray<GoLCells> nextGrid;
-        [ReadOnly] public uint2 gridSize;
-        [ReadOnly] public uint2 gridSizeInCompressed;
-
-        public ProfilerMarker neighborMarker;
-        public ProfilerMarker aliveMarker;
-
-        private bool IsLogIndex(int index)
-        {
-            return index is >= 16 * 512 + 7 and <= 16 * 512 + 9 ||
-                   index is >= 16 * 513 + 7 and <= 16 * 513 + 9 ||
-                   index is >= 16 * 514 + 7 and <= 16 * 514 + 9;
-        }
-
-        [BurstCompile]
-        public unsafe void Execute(int startIndex, int count)
-        {
-            const ulong maskNs = 0x7;
-            const ulong maskCell = 0x5;
-
-            //Neighbor array helps vectorized counting neighbors
-            //this way is much fast then in-place alive check
-            //inspired from FoneE's implementation
-            var neighbors = stackalloc byte[64];
-
-            for (int idx = 0; idx < count; idx++)
-            {
-                var val = 0ul;
-                var index = startIndex + idx;
-
-                var cell = grid[index].cells;
-
-                //CPU without SSE4 support will not be able to run this job
-                if (!X86.Popcnt.IsPopcntSupported) return;
-
-
-                //Edge case might not occurs frequently, tag it as unlikely will improve about 5% performance
-                //Access memory as sequential as possible
-
-                var e = Hint.Unlikely(index % gridSizeInCompressed.x == gridSizeInCompressed.x - 1)
-                    ? 0
-                    : grid[index + 1].cells & 1;
-                var w = Hint.Unlikely(index % gridSizeInCompressed.x == 0)
-                    ? 0
-                    : (grid[index - 1].cells & 0x8000000000000000) >> 63;
-
-                var ne = Hint.Unlikely(index % gridSizeInCompressed.x == gridSizeInCompressed.x - 1 ||
-                                       index - gridSizeInCompressed.x < 0)
-                    ? 0
-                    : (grid[index - (int)gridSizeInCompressed.x + 1].cells) & 1;
-                var n = Hint.Unlikely(index - gridSizeInCompressed.x < 0)
-                    ? 0
-                    : grid[index - (int)gridSizeInCompressed.x].cells;
-                var nw = Hint.Unlikely(index % gridSizeInCompressed.x == 0 || index - gridSizeInCompressed.x < 0)
-                    ? 0
-                    : (grid[index - (int)gridSizeInCompressed.x - 1].cells & 0x8000000000000000) >> 63;
-
-
-                var se = Hint.Unlikely(index % gridSizeInCompressed.x == gridSizeInCompressed.x - 1 ||
-                                       index + gridSizeInCompressed.x >= grid.Length)
-                    ? 0
-                    : grid[index + (int)gridSizeInCompressed.x + 1].cells & 1;
-                var s = Hint.Unlikely(index + gridSizeInCompressed.x >= grid.Length)
-                    ? 0
-                    : grid[index + (int)gridSizeInCompressed.x].cells;
-                var sw = Hint.Unlikely(index % gridSizeInCompressed.x == 0 ||
-                                       index + gridSizeInCompressed.x >= grid.Length)
-                    ? 0
-                    : (grid[index + (int)gridSizeInCompressed.x - 1].cells & 0x8000000000000000) >> 63;
-
-
-                //Here is how huge improvement comes from, we try let compiler generate more vectorization code.
-                //It's important that access memory as sequential as possible,
-                //in previous implementation I process edge case first then process internal cells,
-                //but after change order, performance improved about 80%, that's huge,
-                //it's seem Burst generate more efficient assembly code, not only the cache friendly access,
-                //but I'm not sure about this, need to investigate assembly more.
-                neighbors[0] = (byte)(nw + w + sw + (ulong)X86.Popcnt.popcnt_u64(n & 3) +
-                                      (ulong)X86.Popcnt.popcnt_u64(s & 3) + ((cell & 2) >> 1));
-                for (int i = 1; i < 63; i++)
-                {
-                    //cool low level intrinsics for counting neighbors
-                    neighbors[i] = (byte)(X86.Popcnt.popcnt_u64(n & (maskNs << (i - 1))) +
-                                          X86.Popcnt.popcnt_u64(s & (maskNs << (i - 1))) +
-                                          X86.Popcnt.popcnt_u64((maskCell << (i - 1)) & cell));
-                }
-
-                neighbors[63] = (byte)(ne + e + se + (ulong)X86.Popcnt.popcnt_u64(n & (maskNs << 62)) +
-                                       (ulong)X86.Popcnt.popcnt_u64(s & (maskNs << 62)) +
-                                       ((cell & 0x4000000000000000) >> 62));
-
-                //Almost fully vectorized by Burst. inspired from FoneE's implementation
-                for (int i = 0; i < 64; i++)
-                {
-                    //ulong mask = 1ul << i;
-                    bool isSet = (cell & (1ul << i)) > 0;
-                    if (isSet)
-                    {
-                        bool isAlive = neighbors[i] == 2 || neighbors[i] == 3;
-                        val |= isAlive ? (1ul << i) : 0;
-                    }
-                    else
-                    {
-                        bool isAlive = neighbors[i] == 3;
-                        val |= isAlive ? (1ul << i) : 0;
-                    }
-                }
-
-                nextGrid[index] = new GoLCells { cells = val };
-                UnsafeUtility.MemClear(neighbors, 64);
-            }
-        }
-    }
-
 
     //FoneE's implementation
     //https://github.com/OfficialFoneE/DOTS-Conway/blob/e77566e5a7c1835257f08e2e5ae0a2869e46ba03/Assets/Scripts/Conway.Jobs.cs
 
+    [BurstCompile]
     public partial struct FoneEConway
     {
         [BurstCompile]

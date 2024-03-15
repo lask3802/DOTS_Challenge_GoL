@@ -4,17 +4,19 @@ using System.Collections.Generic;
 using TMPro;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace LASK.GoL.CompressBits
 {
     public class GoLUI : MonoBehaviour
     {
-        public GoLSimulator simulator;
+        [FormerlySerializedAs("groups")] [FormerlySerializedAs("simulator")] public GoLGroupControl group;
         public TMP_InputField gridSizeInput;
-        
+        public TextMeshProUGUI activeCountText;
         void Start()
         {
-            gridSizeInput.text = $"{simulator.gridSize.x}";
+            gridSizeInput.text = $"{group.simulator[0].gridSize.x}";
+            activeCountText.text = $"X{group.activeCount}";
         }
         
         public void OnEditGridSize(string newSize)
@@ -26,26 +28,43 @@ namespace LASK.GoL.CompressBits
             
         }
         
+        public void OnActiveCountChanged(float count)
+        {
+            var cntInt = Mathf.RoundToInt(count);
+            activeCountText.text = $"X{cntInt}";
+            group.OnActiveCountChanged(cntInt);
+        }
+        
         public void OnApplyGridSize()
         {
             var size = uint.Parse(gridSizeInput.text);
-            simulator.isPaused = true;
-            simulator.ResetGrid(size);
+            group.PauseAll();
+            group.ResetGrid(size);
         }
 
         public void OnFirstAttemptCheck()
         {
-            simulator.currentImplementation = GoLSimulator.Implementation.FirstAttempt;
+            group.ChangeImplementation(GoLSimulator.Implementation.FirstAttempt);
         }
         
         public void OnSecondAttemptCheck()
         {
-            simulator.currentImplementation = GoLSimulator.Implementation.SecondAttempt;
+            group.ChangeImplementation(GoLSimulator.Implementation.SecondAttempt);
         }
 
         public void OnFoneECheck()
         {
-            simulator.currentImplementation = GoLSimulator.Implementation.FoneE;
+            group.ChangeImplementation(GoLSimulator.Implementation.FoneE);
+        }
+        
+        public void OnFoneESquareCheck()
+        {
+            group.ChangeImplementation(GoLSimulator.Implementation.FoneESquare);
+        }
+        
+        public void SquareLayout()
+        {
+            group.ChangeImplementation(GoLSimulator.Implementation.SquareLayout);
         }
     }
 }

@@ -1,6 +1,6 @@
 #pragma kernel CSMain
 
-RWTexture2D<float> Result;
+RWTexture2D<half> Result;
 StructuredBuffer<uint2> GoLData;
 uint Width; 
 
