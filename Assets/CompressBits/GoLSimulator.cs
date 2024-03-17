@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
 using Unity.Burst.Intrinsics;
@@ -9,7 +8,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Profiling;
-using Unity.VisualScripting;
+
 using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
@@ -40,10 +39,11 @@ namespace LASK.GoL.CompressBits
             SecondAttempt,
             FoneE,
             FoneESquare,
-            SquareLayout,
+            Liar,
+            LiarWrap,
         }
 
-        public Implementation currentImplementation = Implementation.SquareLayout;
+        public Implementation currentImplementation = Implementation.LiarWrap;
 
         // Start is called before the first frame update
         void Start()
@@ -77,15 +77,32 @@ namespace LASK.GoL.CompressBits
                 case Implementation.FoneESquare:
                     FoneESquare();
                     break;
-                case Implementation.SquareLayout:
-                    SquareLayout();
+                case Implementation.Liar:
+                    Liar();
                     break;
+                case Implementation.LiarWrap:
+                    LiarWrap();
+                    break;
+                
                 default:
                     throw new ArgumentOutOfRangeException();
             }
         }
 
-        private void SquareLayout()
+        private void LiarWrap()
+        {
+            var job = new LiarWrapJob
+            {
+                grid = Tick % 2 == 1 ? gridBack : gridFront,
+                nextGrid = Tick % 2 == 1 ? gridFront : gridBack,
+                gridSize = gridSize,
+                //batchCnt = 4,
+                gridSizeInCompressed = new int2((int)gridSize.x / 8, (int)gridSize.y /8),
+            };
+            job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+        }
+
+        private void Liar()
         {
             var job = new LiarJob
             {

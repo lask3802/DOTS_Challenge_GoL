@@ -1,18 +1,14 @@
-﻿using System.Runtime.CompilerServices;
-using Unity.Burst;
-using Unity.Burst.CompilerServices;
-using Unity.Burst.Intrinsics;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
-using Unity.Jobs;
-using Unity.Mathematics;
-using Unity.Profiling;
-using UnityEngine;
-
-namespace LASK.GoL.CompressBits
+﻿namespace LASK.GoL.CompressBits
 {
+    using System.Runtime.CompilerServices;
+    using Unity.Burst;
+    using Unity.Collections;
+    using Unity.Collections.LowLevel.Unsafe;
+    using Unity.Jobs;
+    using Unity.Mathematics;
+
     [BurstCompile]
-    public partial struct LiarJob : IJobParallelForBatch
+    public partial struct LiarWrapJob : IJobParallelForBatch
     {
         [NativeDisableUnsafePtrRestriction] [ReadOnly]
         public NativeArray<GoLCells> grid;
@@ -50,8 +46,9 @@ namespace LASK.GoL.CompressBits
         [BurstCompile]
         public unsafe void Execute(int startIndex, int count)
         {
-            var neighbors = stackalloc byte[28];
-            
+            const int neighborCounts = 28;
+            var neighbors = stackalloc byte[neighborCounts];
+
             const ulong northMask = 0x7;
             const ulong southMask = 0x07_00_00_00_00_00_00_00;
             const ulong westMask = 0x808080;
@@ -61,100 +58,109 @@ namespace LASK.GoL.CompressBits
             const ulong southWestMask = 0x80_00_00_00_00_00_00_00;
             const ulong southEastMask = 0x01_00_00_00_00_00_00_00;
 
-
-            int startX = (int)(startIndex % gridSizeInCompressed.x);
-            int startY = (int)(startIndex / gridSizeInCompressed.x);
-
-            int x = startX;
-            int y = startY;
-
+            
+            //No branch in the loop, Full unroll every loops. Highly vectorized
             for (int idx = 0; idx < count; idx++)
             {
                 var index = startIndex + idx;
                 var cell = grid[index].cells;
 
-                bool hasWest = x - 1 >= 0;
-                bool hasEast = x + 1 < gridSizeInCompressed.x;
-                bool hasNorth = y + 1 < gridSizeInCompressed.y;
-                bool hasSouth = y - 1 >= 0;
+                /* int2 coordinate slower than x,y
+                 var xy = new int2(index % gridSizeInCompressed.x, index / gridSizeInCompressed.x);
+                
+                var northIndex = XYToIndexWrap(xy + new int2(0, 1));
+                var southIndex = XYToIndexWrap(xy + new int2(0, -1));
+                var westIndex = XYToIndexWrap(xy + new int2(-1, 0));
+                var eastIndex = XYToIndexWrap(xy + new int2(1, 0));
 
-                var northIndex = (index + gridSizeInCompressed.x);
-                var southIndex = (index - gridSizeInCompressed.x);
-                var westIndex = index - 1;
-                var eastIndex = index + 1;
+                var northWestIndex = XYToIndexWrap(xy + new int2(-1, 1));
+                var northEastIndex = XYToIndexWrap(xy + new int2(1, 1));
+                var southWestIndex = XYToIndexWrap(xy + new int2(-1, -1));
+                var southEastIndex = XYToIndexWrap(xy + new int2(1, -1));*/
+                
+                 
+                int x = index % gridSizeInCompressed.x;
+                int y = index / gridSizeInCompressed.x;
+                var northIndex = XYToIndexWrap(x, y + 1);
+                var southIndex = XYToIndexWrap(x, y - 1);
+                var westIndex = XYToIndexWrap(x - 1, y);
+                var eastIndex = XYToIndexWrap(x + 1, y);
 
-                var northWestIndex = northIndex - 1;
-                var northEastIndex = northIndex + 1;
-                var southWestIndex = southIndex - 1;
-                var southEastIndex = southIndex + 1;
+                var northWestIndex = XYToIndexWrap(x - 1, y + 1);
+                var northEastIndex = XYToIndexWrap(x + 1, y + 1);
+                var southWestIndex = XYToIndexWrap(x - 1, y - 1);
+                var southEastIndex = XYToIndexWrap(x + 1, y - 1);
 
                 //In-cell neighbors
-                for (int neighborIdx = 0; neighborIdx < 28; neighborIdx++)
+                for (int neighborIdx = 0; neighborIdx < neighborCounts; neighborIdx++)
                 {
                     neighbors[neighborIdx] =
                         CountBits(cell & Tables.NeighborLookups[NeighborIndex.ToBitIndex(neighborIdx)]);
                 }
+
                 
-                if (Hint.Likely(hasSouth && hasWest))
                 {
                     var southWest = GetValue(southWestIndex);
                     neighbors[0] += CountBits(southWest & southWestMask);
                 }
+
                 
-                if (Hint.Likely(hasSouth))
                 {
                     var south = GetValue(southIndex);
                     neighbors[0] += (byte)(GetBit(south, 56) + GetBit(south, 57));
                     //general south side 
                     for (int neighborIdx = 1; neighborIdx < 7; neighborIdx++)
                     {
-                        neighbors[neighborIdx]+=CountBits(south & (southMask <<  (neighborIdx - 1)));
+                        neighbors[neighborIdx] += CountBits(south & (southMask << (neighborIdx - 1)));
                     }
+
                     neighbors[7] += (byte)(GetBit(south, 62) + GetBit(south, 63));
                 }
+
                 
-                if(Hint.Likely(hasSouth && hasEast))
                 {
                     var southEast = GetValue(southEastIndex);
                     neighbors[7] += CountBits(southEast & southEastMask);
                 }
-                
-                if (Hint.Likely(hasWest))
+
+               
                 {
                     var west = GetValue(westIndex);
                     neighbors[0] += (byte)(GetBit(west, 7) + GetBit(west, 15));
-                    
+
                     //general east side 
                     for (int neighborIdx = 8; neighborIdx < 14; neighborIdx++)
                     {
-                        neighbors[neighborIdx]+=CountBits(west & (westMask << (8 * (neighborIdx - 8))));
+                        neighbors[neighborIdx] += CountBits(west & (westMask << (8 * (neighborIdx - 8))));
                     }
+
                     //bitIndex 56
                     neighbors[20] += (byte)(GetBit(west, 55) + GetBit(west, 63));
                 }
+
                 
-                if(Hint.Likely(hasEast))
                 {
                     var east = GetValue(eastIndex);
                     neighbors[7] += (byte)(GetBit(east, 0) + GetBit(east, 8));
-                    
+
                     //general west side 
                     for (int neighborIdx = 14; neighborIdx < 20; neighborIdx++)
                     {
-                        neighbors[neighborIdx]+=CountBits(east & (eastMask << (8 * (neighborIdx-14))));
+                        neighbors[neighborIdx] += CountBits(east & (eastMask << (8 * (neighborIdx - 14))));
                     }
+
                     //bitIndex 63
                     neighbors[27] += (byte)(GetBit(east, 56) + GetBit(east, 48));
                 }
+
                 
-                if(Hint.Likely(hasNorth && hasWest))
                 {
                     var northWest = GetValue(northWestIndex);
                     //bitIndex 56
                     neighbors[20] += CountBits(northWest & northWestMask);
                 }
+
                 
-                if (Hint.Likely(hasNorth))
                 {
                     var north = GetValue(northIndex);
                     //bitIndex 56
@@ -164,22 +170,22 @@ namespace LASK.GoL.CompressBits
                     {
                         var shiftedMask = (northMask << (neighborIdx - 21));
                         var countBits = CountBits(north & shiftedMask);
-                        neighbors[neighborIdx]+=countBits;
+                        neighbors[neighborIdx] += countBits;
                     }
+
                     //bitIndex 63
                     neighbors[27] += (byte)(GetBit(north, 6) + GetBit(north, 7));
                 }
+
                 
-                if(Hint.Likely(hasNorth && hasEast))
                 {
                     var northEast = GetValue(northEastIndex);
                     neighbors[27] += CountBits(northEast & northEastMask);
                 }
-                
-               
-               
-                ulong next = 0ul;
-                for(int i = 0; i < 28; i++)
+
+
+                var next = 0ul;
+                for (int i = 0; i < neighborCounts; i++)
                 {
                     var bitIndex = NeighborIndex.ToBitIndex(i);
                     var cellState = GetBit(cell, bitIndex);
@@ -188,21 +194,14 @@ namespace LASK.GoL.CompressBits
                     var isAlive = cellState == 1 ? (is2 || is3) : is3;
                     next |= isAlive ? 1ul << bitIndex : 0;
                 }
+
                 next |= Liar(cell);
                 nextGrid[index] = new GoLCells { cells = next };
-
-                //move to next block
-                x++;
-                if (x >= gridSizeInCompressed.x)
-                {
-                    y++;
-                    x = 0;
-                }
-                UnsafeUtility.MemClear(neighbors, 28);
+                UnsafeUtility.MemClear(neighbors, neighborCounts);
             }
         }
 
-        
+
         //https://dotat.at/prog/life/liar2.c
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -248,7 +247,34 @@ namespace LASK.GoL.CompressBits
             return (bmp & 0x007E7E7E7E7E7E00);
             // total 19 + 7 = 26 operations
         }
-        
+
+        [BurstCompile]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int ModPositive(int x, int m)
+        {
+            /*int r = x % m;
+            return r < 0 ? r + m : r;*/
+            return (x + m) % m;
+        }
+
+        [BurstCompile]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int XYToIndexWrap(int x, int y)
+        {
+            return ModPositive(y, gridSizeInCompressed.y) * (int)gridSizeInCompressed.x +
+                   ModPositive(x, gridSizeInCompressed.x);
+        }
+
+        [BurstCompile]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int XYToIndexWrap(int2 xy)
+        {
+            xy = (xy+gridSizeInCompressed)%gridSizeInCompressed;
+           /*return ModPositive(xy.y, gridSizeInCompressed.y) * (int)gridSizeInCompressed.x +
+                   ModPositive(xy.x, gridSizeInCompressed.x);*/
+           return xy.y * gridSizeInCompressed.x + xy.x;
+        }
+
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool HasNorth(int index)
@@ -351,9 +377,10 @@ namespace LASK.GoL.CompressBits
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private byte CountBits(ulong value)
         {
-            if (!X86.Popcnt.IsPopcntSupported)
+            return (byte)math.countbits(value);
+            /*if (!X86.Popcnt.IsPopcntSupported)
                 return (byte)math.countbits(value);
-            return (byte)X86.Popcnt.popcnt_u64(value);
+            return (byte)X86.Popcnt.popcnt_u64(value);*/
         }
 
         [BurstCompile]

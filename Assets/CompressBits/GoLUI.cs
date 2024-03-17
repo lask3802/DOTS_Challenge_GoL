@@ -64,7 +64,12 @@ namespace LASK.GoL.CompressBits
         
         public void SquareLayout()
         {
-            group.ChangeImplementation(GoLSimulator.Implementation.SquareLayout);
+            group.ChangeImplementation(GoLSimulator.Implementation.Liar);
+        }
+        
+        public void LiarWrap()
+        {
+            group.ChangeImplementation(GoLSimulator.Implementation.LiarWrap);
         }
     }
 }

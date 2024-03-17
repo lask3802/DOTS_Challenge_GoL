@@ -56,7 +56,8 @@ namespace LASK.GoL.CompressBits
         {
            
             if (simulator.currentImplementation == GoLSimulator.Implementation.FoneESquare
-                || simulator.currentImplementation == GoLSimulator.Implementation.SquareLayout
+                || simulator.currentImplementation == GoLSimulator.Implementation.Liar
+                || simulator.currentImplementation == GoLSimulator.Implementation.LiarWrap
                 )
             {
                 RenderSquareLayout();
