@@ -14,8 +14,9 @@
         public NativeArray<GoLCells> grid;
 
         [WriteOnly] public NativeArray<GoLCells> nextGrid;
-        [ReadOnly] public uint2 gridSize;
-        [ReadOnly] public int2 gridSizeInCompressed;
+
+        public int ArrayWidth;
+        public int ArrayHeight;
 
 
         /* square bit layout, just show edges to figure out how edge case works
@@ -79,8 +80,8 @@
                 var southEastIndex = XYToIndexWrap(xy + new int2(1, -1));*/
                 
                  
-                int x = index % gridSizeInCompressed.x;
-                int y = index / gridSizeInCompressed.x;
+                int x = index % ArrayWidth;
+                int y = index / ArrayWidth;
                 var northIndex = XYToIndexWrap(x, y + 1);
                 var southIndex = XYToIndexWrap(x, y - 1);
                 var westIndex = XYToIndexWrap(x - 1, y);
@@ -261,74 +262,24 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int XYToIndexWrap(int x, int y)
         {
-            return ModPositive(y, gridSizeInCompressed.y) * (int)gridSizeInCompressed.x +
-                   ModPositive(x, gridSizeInCompressed.x);
+            return ModPositive(y, ArrayHeight) * ArrayWidth +
+                   ModPositive(x, ArrayWidth);
         }
 
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int XYToIndexWrap(int2 xy)
-        {
-            xy = (xy+gridSizeInCompressed)%gridSizeInCompressed;
-           /*return ModPositive(xy.y, gridSizeInCompressed.y) * (int)gridSizeInCompressed.x +
-                   ModPositive(xy.x, gridSizeInCompressed.x);*/
-           return xy.y * gridSizeInCompressed.x + xy.x;
-        }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool HasNorth(int index)
-        {
-            return GetY(index) + 1 < gridSizeInCompressed.y;
-        }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool HasSouth(int index)
-        {
-            return GetY(index) > 0;
-        }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool HasWest(int index)
-        {
-            return GetX(index) > 0;
-        }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool HasEast(int index)
-        {
-            return GetX(index) + 1 < gridSizeInCompressed.x;
-        }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int WestIndex(int index)
-        {
-            return index - 1;
-        }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int EastIndex(int index)
-        {
-            return index + 1;
-        }
+        
 
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int NorthIndex(int index)
         {
-            return index + (int)gridSizeInCompressed.x;
+            return index + ArrayWidth;
         }
 
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int SouthIndex(int index)
         {
-            return index - (int)gridSizeInCompressed.x;
+            return index - ArrayWidth;
         }
 
         [BurstCompile]
@@ -396,19 +347,6 @@
         {
             return (byte)((value >> bit) & 1);
         }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int GetX(int index)
-        {
-            return index % gridSizeInCompressed.x;
-        }
-
-        [BurstCompile]
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int GetY(int index)
-        {
-            return index / gridSizeInCompressed.x;
-        }
+       
     }
 }

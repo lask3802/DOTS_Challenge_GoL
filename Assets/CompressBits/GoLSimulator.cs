@@ -95,9 +95,8 @@ namespace LASK.GoL.CompressBits
             {
                 grid = Tick % 2 == 1 ? gridBack : gridFront,
                 nextGrid = Tick % 2 == 1 ? gridFront : gridBack,
-                gridSize = gridSize,
-                //batchCnt = 4,
-                gridSizeInCompressed = new int2((int)gridSize.x / 8, (int)gridSize.y /8),
+                ArrayWidth = (int)gridSize.x / 8,
+                ArrayHeight = (int)gridSize.y / 8,
             };
             job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
         }
