@@ -6,7 +6,7 @@ It primarily implements two modes:
 
 - Static Size Grid: Implemented using only Jobs + Burst + MonoBehaviour.
 - Dynamic Grid: Implemented using ECS.
-
+---
 <!-- TOC -->
 * [DOTS Challenge Conway's Game of Life](#dots-challenge-conways-game-of-life)
   * [How to Use](#how-to-use)
