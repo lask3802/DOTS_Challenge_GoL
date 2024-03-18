@@ -10,9 +10,12 @@ It primarily implements two modes:
 <!-- TOC -->
 * [DOTS Challenge Conway's Game of Life](#dots-challenge-conways-game-of-life)
   * [How to Use](#how-to-use)
-  * [Implementation Details](#implementation-details)
+  * [Benchmark](#benchmark)
     * [Static Size Grid](#static-size-grid)
     * [Dynamic Size Grid](#dynamic-size-grid)
+  * [Implementation Details](#implementation-details)
+    * [Static Size Grid](#static-size-grid-1)
+    * [Dynamic Size Grid](#dynamic-size-grid-1)
   * [Things I Wanted to Do But Didn't](#things-i-wanted-to-do-but-didnt)
   * [Devlog](#devlog)
     * [Trivial Version](#trivial-version)
@@ -21,7 +24,7 @@ It primarily implements two modes:
     * [Visiting Discord for Inspiration from FoneE's Code](#visiting-discord-for-inspiration-from-fonees-code)
     * [LIAR (Life In A Register)](#liar-life-in-a-register)
     * [Rendering Stuff](#rendering-stuff)
-    * [Dynamic Size Grid](#dynamic-size-grid-1)
+    * [Dynamic Size Grid](#dynamic-size-grid-2)
     * [Hiding the Time for GPU Data Copy](#hiding-the-time-for-gpu-data-copy)
 <!-- TOC -->
 
@@ -43,6 +46,38 @@ For Dynamic size Scene:
 - The "grid size" field indicates the length and width of a cell, with the length and width being the same value, defaulting to 1024x1024 there is no size limit.
 - To change the size, you need to click the "ReSimulate" button for it to take effect.
 
+## Benchmark
+
+Hardware Spec: 
+
+- CPU: AMD Ryzen 5900X 12C/24T
+- GPU: NVIDIA RTX 3070
+### Static Size Grid
+
+Just showing the best performance algorithm.
+
+| Grid Size   | Algorithm | FPS |
+|-------------|-----------|-----|
+| 4096x4096   | Square Layout wrap (LIAR) | 900 |
+| 8192x8192   | Square Layout wrap (LIAR) | 360 |
+| 16384x16384 | Square Layout wrap (LIAR) | 100 |
+| 21568x21568 | Square Layout wrap (LIAR) | 60  |
+| 30976x30976 | Square Layout wrap (LIAR) | 30  |
+
+---
+
+### Dynamic Size Grid
+
+
+| Grid Size | FPS |
+|-----------|-----|
+| 4096x4096 | 150 |
+| 6300x6300 | 60  |
+| 8192x8192 | 43  |
+---
+
+
+
 ## Implementation Details
 
 ### Static Size Grid
@@ -52,6 +87,7 @@ See [Devlog](#devlog) part for more details.
 The method of calculating states for the dynamic size grid inherits the LIAR implementation from the static size grid. Each entity represents the state of an 8x8 cell block. Custom GPU Instancing shaders were used for rendering, with a Material override component to pass cell states into the shader.
 
 The performance is approximately 4 times lower than the static size grid with the same number of cells, possibly because I couldn't ensure the contiguity of neighbor cells in memory.
+
 
 ## Things I Wanted to Do But Didn't
 - Performance issues with dynamic size: It might be possible to organize chunks or find other ways to improve memory access efficiency, but I didn't have time to try.
