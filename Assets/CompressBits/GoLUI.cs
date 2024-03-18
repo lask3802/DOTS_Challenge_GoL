@@ -22,7 +22,7 @@ namespace LASK.GoL.CompressBits
         public void OnEditGridSize(string newSize)
         {
             var size = uint.Parse(newSize);
-            var fixedSize = Math.Clamp(size/64*64, 64, (uint)SystemInfo.maxTextureSize);
+            var fixedSize = Math.Clamp(size/64*64, 64, 1<<20);
             if(fixedSize != size)
                 gridSizeInput.text = $"{fixedSize}";
             
