@@ -14,7 +14,7 @@ namespace LASK.GoL.CompressBits
         public MeshRenderer meshRenderer;
         private ComputeBuffer golData;
         private static JobHandle copyJobHandle;
-        private NativeArray<uint2> gpuDataArray;
+        //private NativeArray<uint2> gpuDataArray;
         
         private static readonly int GoLData = Shader.PropertyToID("GoLData");
         private static readonly int Width = Shader.PropertyToID("Width");
@@ -70,10 +70,10 @@ namespace LASK.GoL.CompressBits
                     ComputeBufferMode.SubUpdates);
             }
             
-            gpuDataArray = golData.BeginWrite<uint2>(0, bufferSize);
-            var arrayCopyJob = new ArrayCopyJob<uint2>
+            var gpuDataArray = golData.BeginWrite<ulong>(0, bufferSize);
+            var arrayCopyJob = new ArrayCopyJob<ulong>
             {
-                source = simulator.Grid.Reinterpret<uint2>(),
+                source = simulator.Grid.Reinterpret<ulong>(),
                 destination = gpuDataArray
             };
             //gpuDataArray.CopyFrom(simulator.Grid.Reinterpret<uint2>());
@@ -98,17 +98,19 @@ namespace LASK.GoL.CompressBits
         }
 
 
-        [BurstCompile]
-        public struct ArrayCopyJob<T> : IJob where T : unmanaged
-        {
-            [ReadOnly] public NativeArray<T> source;
-            [WriteOnly][NativeDisableUnsafePtrRestriction] public NativeArray<T> destination;
+        
+    }
+   
+    [BurstCompile]
+    public struct ArrayCopyJob<T> : IJob where T : unmanaged
+    {
+        [ReadOnly] public NativeArray<T> source;
+        [WriteOnly][NativeDisableUnsafePtrRestriction] public NativeArray<T> destination;
 
-            [BurstCompile]
-            public void Execute()
-            {
-                destination.CopyFrom(source); 
-            }
+        [BurstCompile]
+        public void Execute()
+        {
+            destination.CopyFrom(source); 
         }
     }
 }

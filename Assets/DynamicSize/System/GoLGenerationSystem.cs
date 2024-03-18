@@ -22,6 +22,7 @@ namespace DynamicSize.System
     public partial struct GoLGenerationSystem : ISystem
     {
         private float tickCountDown;
+        private EntityQuery cellQuery;
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
@@ -30,7 +31,7 @@ namespace DynamicSize.System
             state.RequireForUpdate<CurrentCells>();
             state.RequireForUpdate<GoLPosition>();
             state.RequireForUpdate<CellsManagement>();
-          
+            cellQuery = SystemAPI.QueryBuilder().WithAll<CurrentCells>().Build();
             tickCountDown = 0f;
         }
 
@@ -51,8 +52,10 @@ namespace DynamicSize.System
             }
             tickCountDown = golState.TickTime;
             
+            var activeCellCounts = cellQuery.CalculateEntityCount();
+            
             // We can't resize in the job, so we do it here and ensure we have enough space.
-            if (management.ActiveCells.Count() >= management.ActiveCells.Capacity / 2)
+            if (activeCellCounts >= management.ActiveCells.Capacity / 2)
             {
                 management.ActiveCells.Capacity *= 2;
                 
@@ -61,10 +64,10 @@ namespace DynamicSize.System
 
             
             // worst case scenario, we need to spawn all neighbor cells around the active cells.
-            if (management.CellsToSpawn.Capacity < management.ActiveCells.Count() / 2)
+            if (management.CellsToSpawn.Capacity < activeCellCounts / 2)
             {
                 var capacity = math.max(management.CellsToSpawn.Capacity * 2,
-                    management.ActiveCells.Count() * 2);
+                    activeCellCounts * 2);
                 management.CellsToSpawn.Capacity = math.min(capacity, int.MaxValue);
                 Debug.Log($"cells to spawn capacity: {management.CellsToSpawn.Capacity}");
             }
@@ -79,13 +82,16 @@ namespace DynamicSize.System
             var cellsToEnable = new NativeParallelHashSet<Entity>(management.ActiveCells.Count(), state.WorldUpdateAllocator);
             allocPM.End();
             */
-           
-           
+            
+           /* var cellsToDestroyList = new NativeList<Entity>(activeCellCounts, state.WorldUpdateAllocator);
+            var cellsToDestroyPosition = new NativeList<int2>(activeCellCounts, state.WorldUpdateAllocator);*/
             var job = new LiarJob
             {
                 ActiveCells = management.ActiveCells.AsReadOnly(),
                 CellsLookup = SystemAPI.GetComponentLookup<CurrentCells>(),
                 CellsToSpawn = management.CellsToSpawn.AsParallelWriter(),
+                //CellsToDestroyEntities = cellsToDestroyList.AsParallelWriter(),
+               // CellsToDestroyPosition = cellsToDestroyPosition.AsParallelWriter()
             };
             state.Dependency = job.ScheduleParallel(state.Dependency);
             
@@ -93,6 +99,14 @@ namespace DynamicSize.System
             var swapJob = new SwapNextJob();
             state.Dependency = swapJob.ScheduleParallel(state.Dependency);
             state.Dependency.Complete();
+            
+            
+            /*state.EntityManager.DestroyEntity(cellsToDestroyList.AsArray());
+            foreach (var position in cellsToDestroyPosition.AsArray())
+            {
+                management.ActiveCells.Remove(position);
+            }*/
+            
             /*state.Dependency= new DisableCellsJob
             {
                 EntitiesToDisabled = cellsToDisable,
@@ -159,8 +173,12 @@ namespace DynamicSize.System
             cells.Value = nextCells.Value;
         }
     }
-    
-   
+
+    struct DestroyCellInfo
+    {
+        public int2 Position;
+        public Entity Entity;
+    }
     
     [BurstCompile]
     public partial struct LiarJob : IJobEntity
@@ -169,6 +187,8 @@ namespace DynamicSize.System
         [Unity.Collections.ReadOnly] public ComponentLookup<CurrentCells> CellsLookup;
         
         [WriteOnly] public NativeList<int2>.ParallelWriter CellsToSpawn;
+        //[WriteOnly] public NativeList<Entity>.ParallelWriter CellsToDestroyEntities;
+       // [WriteOnly] public NativeList<int2>.ParallelWriter CellsToDestroyPosition;
        // [WriteOnly] public NativeParallelHashSet<Entity>.ParallelWriter CellsToDisabled;
        // [WriteOnly] public NativeParallelHashSet<Entity>.ParallelWriter CellsToEnabled;
 
@@ -359,8 +379,21 @@ namespace DynamicSize.System
             
             highBits.Value = (int)(next >> 32);
             lowBits.Value = (int)next;
-            if (next == 0)
+
+            if (next != 0)
             {
+                for (int i = 0; i < newCellCnt; i++)
+                {
+                    if (ActiveCells.ContainsKey(newCells[i].Position))
+                        continue;
+                    CellsToSpawn.AddNoResize(newCells[i].Position);
+                }
+            }
+            /*
+            if (next == 0 && cells.Value == 0)
+            {
+                CellsToDestroyEntities.AddNoResize(entity);
+                CellsToDestroyPosition.AddNoResize(position.Position);
                 //CellsToDisabled.Add(entity);
                 //NextCellLookup.SetComponentEnabled(entity, false);
                 //EntitiesToDisabled.AddNoResize(new EntityToDisabled{Position = position.Position, Entity = entity});
@@ -373,7 +406,7 @@ namespace DynamicSize.System
                         continue;
                     CellsToSpawn.AddNoResize(newCells[i].Position);
                 }
-            }
+            }*/
         }
 
         [BurstCompile]

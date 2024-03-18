@@ -16,8 +16,7 @@ namespace DynamicSize.UI
         public TMP_InputField gridSizeInput;
         public TextMeshProUGUI activeCountText;
         
-        public event Action<int,int> OnReSimulate;
-
+        
         public int GridSize { get; private set; } = 64;
         public bool IsReSimulate { get; set; }
         public bool IsInitialized { get; private set; }
@@ -66,9 +65,6 @@ namespace DynamicSize.UI
             IsReSimulate = true;
         }
 
-        private void OnDestroy()
-        {            
-            OnReSimulate = null;
-        }
+      
     }
 }
