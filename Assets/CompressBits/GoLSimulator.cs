@@ -93,12 +93,13 @@ namespace LASK.GoL.CompressBits
         {
             var job = new LiarWrapJob
             {
-                grid = Tick % 2 == 1 ? gridBack : gridFront,
-                nextGrid = Tick % 2 == 1 ? gridFront : gridBack,
+                Grid = Tick % 2 == 1 ? gridBack : gridFront,
+                NextGrid = Tick % 2 == 1 ? gridFront : gridBack,
                 ArrayWidth = (int)gridSize.x / 8,
                 ArrayHeight = (int)gridSize.y / 8,
             };
-            job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+            //at least 2 rows/batch
+            job.ScheduleBatch(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
         }
 
         private void Liar()
@@ -111,7 +112,7 @@ namespace LASK.GoL.CompressBits
                 //batchCnt = 4,
                 gridSizeInCompressed = new int2((int)gridSize.x / 8, (int)gridSize.y /8),
             };
-            job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+            job.ScheduleBatch(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
         }
 
         private void FoneESquare()
@@ -124,7 +125,7 @@ namespace LASK.GoL.CompressBits
                 BaseGrid = Tick % 2 == 1 ? gridBack.Reinterpret<ulong>() : gridFront.Reinterpret<ulong>(),
                 NewGrid = Tick % 2 == 1 ? gridFront.Reinterpret<ulong>() : gridBack.Reinterpret<ulong>(),
             };
-            job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+            job.ScheduleBatch(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
         }
 
         private void OnDestroy()
@@ -182,7 +183,7 @@ namespace LASK.GoL.CompressBits
                 //batchCnt = 4,
                 gridSizeInCompressed = new uint2((uint)gridSize.x / 64, (uint)gridSize.y),
             };
-            job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+            job.Schedule(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
         }
 
 
@@ -198,7 +199,7 @@ namespace LASK.GoL.CompressBits
                 neighborMarker = new ProfilerMarker("NeighbourCounting"),
                 aliveMarker = new ProfilerMarker("AliveCounting")
             };
-            job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+            job.Schedule(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

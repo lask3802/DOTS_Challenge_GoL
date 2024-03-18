@@ -11,9 +11,9 @@
     public partial struct LiarWrapJob : IJobParallelForBatch
     {
         [NativeDisableUnsafePtrRestriction] [ReadOnly]
-        public NativeArray<GoLCells> grid;
+        public NativeArray<GoLCells> Grid;
 
-        [WriteOnly] public NativeArray<GoLCells> nextGrid;
+        [WriteOnly] public NativeArray<GoLCells> NextGrid;
 
         public int ArrayWidth;
         public int ArrayHeight;
@@ -64,7 +64,7 @@
             for (int idx = 0; idx < count; idx++)
             {
                 var index = startIndex + idx;
-                var cell = grid[index].cells;
+                var cell = Grid[index].cells;
 
                 /* int2 coordinate slower than x,y
                  var xy = new int2(index % gridSizeInCompressed.x, index / gridSizeInCompressed.x);
@@ -79,7 +79,34 @@
                 var southWestIndex = XYToIndexWrap(xy + new int2(-1, -1));
                 var southEastIndex = XYToIndexWrap(xy + new int2(1, -1));*/
                 
+                
                  
+                /* slower then direct calculation (300ms)
+                int4 xS = new int4(x, x, x-1, x+1);
+                int4 ys = new int4(y+1, y-1, y, y);
+
+                int4 result4DirX = (xS + ArrayWidth) % ArrayWidth;
+                int4 result4DirY = (ys + ArrayHeight) % ArrayHeight;
+                int4 result4Dir = result4DirY * ArrayWidth + result4DirX;
+                var northIndex = result4Dir[0];
+                var southIndex = result4Dir[1];
+                var westIndex =  result4Dir[2];
+                var eastIndex =  result4Dir[3];
+
+                int4 xTo4Corner = new int4(-1, 1, -1, 1);
+                int4 yTo4Corner = new int4(1, 1, -1, -1);
+                int4 result4CornerX = (xS + xTo4Corner + ArrayWidth) % ArrayWidth;
+                int4 result4CornerY = (ys + yTo4Corner + ArrayHeight) % ArrayHeight;
+                int4 result4Corner = result4CornerY * ArrayWidth + result4CornerX;
+
+                var northWestIndex = result4Corner[0];
+                var northEastIndex = result4Corner[1];
+                var southWestIndex = result4Corner[2];
+                var southEastIndex = result4Corner[3];
+                */
+                 
+                
+                // direct calculation 215ms
                 int x = index % ArrayWidth;
                 int y = index / ArrayWidth;
                 var northIndex = XYToIndexWrap(x, y + 1);
@@ -99,6 +126,28 @@
                         CountBits(cell & Tables.NeighborLookups[NeighborIndex.ToBitIndex(neighborIdx)]);
                 }
 
+                 
+                /* slower then original
+
+                v256 cornerValues = new v256(GetValue(northWestIndex), GetValue(northEastIndex), GetValue(southWestIndex), GetValue(southEastIndex));
+                v256 cornerMasks = new v256(northWestMask, northEastMask, southWestMask, southEastMask);
+                v256 cornerMasked = X86.Avx2.mm256_and_si256(cornerValues, cornerMasks);
+
+
+                //var northWest = GetValue(northWestIndex);
+                //bitIndex 56
+                neighbors[20] += CountBits(cornerMasked.ULong0);
+
+                //var northEast = GetValue(northEastIndex);
+                neighbors[27] += CountBits(cornerMasked.ULong1);
+                //var southWest = GetValue(southWestIndex);
+                neighbors[0] += CountBits(cornerMasked.ULong2);
+
+                //var southEast = GetValue(southEastIndex);
+                neighbors[7] += CountBits(cornerMasked.ULong3);
+
+                */
+                
                 
                 {
                     var southWest = GetValue(southWestIndex);
@@ -197,7 +246,7 @@
                 }
 
                 next |= Liar(cell);
-                nextGrid[index] = new GoLCells { cells = next };
+                NextGrid[index] = new GoLCells { cells = next };
                 UnsafeUtility.MemClear(neighbors, neighborCounts);
             }
         }
@@ -314,14 +363,14 @@
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ulong GetValue(int index)
         {
-            return grid[index].cells;
+            return Grid[index].cells;
         }
 
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ulong GetValue(uint index)
         {
-            return grid[(int)index].cells;
+            return Grid[(int)index].cells;
         }
 
         [BurstCompile]

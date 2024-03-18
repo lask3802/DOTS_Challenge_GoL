@@ -1,5 +1,8 @@
-﻿using Unity.Collections;
+﻿using Unity.Burst;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
+using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -8,46 +11,48 @@ namespace LASK.GoL.CompressBits
    public class GoLRenderer : MonoBehaviour
     {
         public GoLSimulator simulator;
-        public ComputeShader shader;
+        /*public ComputeShader shader;
         public ComputeShader squareRenderingShader;
-        public RenderTexture renderTexture;
+        public RenderTexture renderTexture;*/
+        public Shader horizontalLayoutShader;
+        public Shader squareLayoutShader;
         public MeshRenderer meshRenderer;
         private ComputeBuffer golData;
+        
         private static readonly int GoLData = Shader.PropertyToID("GoLData");
-        private static readonly int Result = Shader.PropertyToID("Result");
         private static readonly int Width = Shader.PropertyToID("Width");
-        private static readonly int GridCellDataBuffer = Shader.PropertyToID("GridCellDataBuffer");
-        private static readonly int ArrayElementWidth = Shader.PropertyToID("ArrayElementWidth");
-        private static readonly int GridCellDrawTexture = Shader.PropertyToID("GridCellDrawTexture");
+        private static readonly int Height = Shader.PropertyToID("Height");
+        private static readonly int BitWidth = Shader.PropertyToID("BitWidth");
+        private static readonly int BitHeight = Shader.PropertyToID("BitHeight");
 
 
         private void OnEnable()
         {
             //Low VRAM video card friendly RT
-            renderTexture = new RenderTexture((int)simulator.gridSize.x, (int)simulator.gridSize.y,0, RenderTextureFormat.R8)
+            /*renderTexture = new RenderTexture((int)simulator.gridSize.x, (int)simulator.gridSize.y,0, RenderTextureFormat.R8)
             {
                 enableRandomWrite = true,
                 filterMode = FilterMode.Point
             };
             renderTexture.Create();
-            meshRenderer.material.mainTexture = renderTexture;
+            meshRenderer.material.mainTexture = renderTexture;*/
             
             simulator.OnGridChanged += OnGridChanged;
         }
 
         private void OnGridChanged(uint2 size)
         {
-            renderTexture.Release();
+           /* renderTexture.Release();
             renderTexture = new RenderTexture((int)size.x, (int)size.y,0, RenderTextureFormat.R8)
             {
                 enableRandomWrite = true,
                 filterMode = FilterMode.Point
             };
-            renderTexture.Create();
-            meshRenderer.material.mainTexture = renderTexture;
+            renderTexture.Create();*/
+            //meshRenderer.material.mainTexture = renderTexture;
             
             golData?.Dispose();
-            var bufferSize = renderTexture.width*renderTexture.height/64;
+            var bufferSize = (int)(size.x*size.y/64);
             golData = new ComputeBuffer(bufferSize, sizeof(ulong), ComputeBufferType.Default,
                 ComputeBufferMode.SubUpdates);
         }
@@ -55,24 +60,40 @@ namespace LASK.GoL.CompressBits
         void Update()
         {
            
-            if (simulator.currentImplementation == GoLSimulator.Implementation.FoneESquare
+           /* if (simulator.currentImplementation == GoLSimulator.Implementation.FoneESquare
                 || simulator.currentImplementation == GoLSimulator.Implementation.Liar
                 || simulator.currentImplementation == GoLSimulator.Implementation.LiarWrap
                 )
             {
-                RenderSquareLayout();
+                RenderSquareLayoutNoRT();
                 return;
             }
-            RenderHorizontalLayout();
+            RenderHorizontalLayout();*/
+           Rendering();
         }
 
-        private void RenderSquareLayout()
+        private void Rendering()
         {
             //var shader = squareRenderingShader;
-            var kernel = squareRenderingShader.FindKernel("CSMain");
-            squareRenderingShader.SetTexture(kernel, GridCellDrawTexture, renderTexture);
+            if (simulator.currentImplementation == GoLSimulator.Implementation.FoneESquare
+                || simulator.currentImplementation == GoLSimulator.Implementation.Liar
+                || simulator.currentImplementation == GoLSimulator.Implementation.LiarWrap
+               )
+            {
+                meshRenderer.material.SetInt(Width, (int)simulator.gridSize.x/8);
+                meshRenderer.material.SetInt(Height, (int)simulator.gridSize.x/8);
+                meshRenderer.material.SetInt(BitWidth, 8);
+                meshRenderer.material.SetInt(BitHeight, 8);
+            }
+            else
+            {
+                meshRenderer.material.SetInt(Width, (int)simulator.gridSize.x/64);
+                meshRenderer.material.SetInt(Height, (int)simulator.gridSize.y);
+                meshRenderer.material.SetInt(BitWidth, 64);
+                meshRenderer.material.SetInt(BitHeight, 1);
+            }
             
-            var bufferSize = renderTexture.width*renderTexture.height/64;
+            var bufferSize = (int)(simulator.gridSize.x*simulator.gridSize.y/64);
             if (golData == null || bufferSize != golData.count)
             {
                 golData?.Dispose();
@@ -80,62 +101,49 @@ namespace LASK.GoL.CompressBits
                     ComputeBufferMode.SubUpdates);
             }
             
-            squareRenderingShader.SetInt(ArrayElementWidth, (int)simulator.gridSize.x/8);
-            
             var buffer = golData.BeginWrite<uint2>(0, bufferSize);
             buffer.CopyFrom(simulator.Grid.Reinterpret<uint2>());
+            
             golData.EndWrite<uint2>(bufferSize);
+            meshRenderer.material.SetBuffer(GoLData, golData);
             
-            squareRenderingShader.SetBuffer(0, GridCellDataBuffer, golData);
-            //Each thread group will rendering 64x64 cells which is the minimal size limits of the grid
-            squareRenderingShader.Dispatch(kernel, renderTexture.width/64, renderTexture.height/64, 1);
         }
-        private void RenderHorizontalLayout()
-        {
-            var kernel = shader.FindKernel("CSMain");
-            shader.SetTexture(kernel, Result, renderTexture);
-            
-            var bufferSize = renderTexture.width*renderTexture.height/64;
-            if (golData == null || bufferSize != golData.count)
-            {
-                golData?.Dispose();
-                golData = new ComputeBuffer(bufferSize, sizeof(ulong), ComputeBufferType.Default,
-                    ComputeBufferMode.SubUpdates);
-            }
-
-            var maxRowSize = (int)simulator.gridSize.x / 64;
-            shader.SetInt(Width, (int)simulator.gridSize.x/64);
-            
-            var buffer = golData.BeginWrite<uint2>(0, bufferSize);
-            buffer.CopyFrom(simulator.Grid.Reinterpret<uint2>());
-            golData.EndWrite<uint2>(bufferSize);
-            
-            shader.SetBuffer(0, GoLData, golData);
-            //Each thread group will rendering 64x64 cells which is the minimal size limits of the grid
-            shader.Dispatch(kernel, maxRowSize, renderTexture.height/64, 1);
-        }
-
-
-        private static int TopLeftBasedToIndex(Vector2Int topLeftBased, Vector2Int gridSize){
-            return (int)topLeftBased.y * (int)gridSize.x + (int)topLeftBased.x;
-        }
-
-        private static int CenterBasedToIndex(Vector2Int centerBased, Vector2Int gridSize)
-        {
-            return TopLeftBasedToIndex(centerBased + gridSize / 2+new Vector2Int(centerBased.x/2,0), gridSize);
-        }
-        
-        
 
         private void OnDisable()
         {
-            renderTexture.Release();
-            renderTexture = null;
             
             golData?.Dispose();
             golData = null;
             
             simulator.OnGridChanged -= OnGridChanged;
+        }
+
+
+        [BurstCompile]
+        public struct ArrayCopyJob<T> : IJobParallelForBatch where T : unmanaged
+        {
+            [ReadOnly] public NativeArray<T> source;
+            [WriteOnly][NativeDisableUnsafePtrRestriction] public NativeArray<T> destination;
+            
+            [BurstCompile]
+            public void Execute(int startIndex, int count)
+            {
+                //
+                //source.GetSubArray(startIndex, count).CopyTo(destination.GetSubArray(startIndex, count));
+                //var endIndex = startIndex + count;
+                destination.GetSubArray(startIndex, count).CopyFrom(source.GetSubArray(startIndex, count)); 
+                /*for(int i = startIndex; i < endIndex; i+=4)
+                {
+                    destination[i] = source[i];
+                    destination[i+1] = source[i+1];
+                    destination[i+2] = source[i+2];
+                    destination[i+3] = source[i+3];
+                }
+                for(int i = endIndex - count % 4; i < endIndex; i++)
+                {
+                    destination[i] = source[i];
+                }*/
+            }
         }
     }
 }

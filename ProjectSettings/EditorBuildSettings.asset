@@ -6,11 +6,11 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/DynamicSize/Scene/DynamicSize.unity
-    guid: 4596600e18e840e47a2f89b006040027
-  - enabled: 1
     path: Assets/CompressBits/CompressedBits.unity
     guid: 2fc5e6be08cd6fc45be90c5eb01a388f
+  - enabled: 1
+    path: Assets/DynamicSize/Scene/DynamicSize.unity
+    guid: 4596600e18e840e47a2f89b006040027
   - enabled: 0
     path: Assets/TrivialJob/Scenes/TrivialJob.unity
     guid: 8c9cfa26abfee488c85f1582747f6a02
