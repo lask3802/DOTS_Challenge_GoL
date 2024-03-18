@@ -18,11 +18,6 @@ namespace DynamicSize.Component
     public struct TriggerGoLInitialize: IComponentData
     { }
 
-    public struct InitialSpawn : IComponentData
-    {
-        public int Width;
-        public int Height;
-    }
     
     [MaterialProperty("_HighBits")]
     public struct RenderingHighBits: IComponentData

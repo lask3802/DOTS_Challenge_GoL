@@ -21,7 +21,7 @@ namespace DynamicSize.Component
     
     //Holds the active cells and the cells to spawn
     
-    public struct CellsManagement: IComponentData, IDisposable
+    public struct CellsManagement: IDisposable, ICleanupComponentData
     {
         /*public NativeParallelHashMap<int2, Entity> ActiveCells
         {

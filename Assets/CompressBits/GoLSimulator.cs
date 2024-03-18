@@ -32,6 +32,8 @@ namespace LASK.GoL.CompressBits
         public bool isDebug = false;
 
         public event Action<uint2> OnGridChanged;
+        
+        private static JobHandle simulationJobHandle;
 
         public enum Implementation
         {
@@ -45,6 +47,11 @@ namespace LASK.GoL.CompressBits
 
         public Implementation currentImplementation = Implementation.LiarWrap;
 
+        #region UnityEvents
+
+        
+
+       
         // Start is called before the first frame update
         void Start()
         {
@@ -88,6 +95,12 @@ namespace LASK.GoL.CompressBits
                     throw new ArgumentOutOfRangeException();
             }
         }
+        
+        void LateUpdate()
+        {
+            simulationJobHandle.Complete();
+        }
+        #endregion
 
         private void LiarWrap()
         {
@@ -99,7 +112,7 @@ namespace LASK.GoL.CompressBits
                 ArrayHeight = (int)gridSize.y / 8,
             };
             //at least 2 rows/batch
-            job.ScheduleBatch(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
+            simulationJobHandle = JobHandle.CombineDependencies(job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x / 8)),simulationJobHandle);
         }
 
         private void Liar()
@@ -112,7 +125,7 @@ namespace LASK.GoL.CompressBits
                 //batchCnt = 4,
                 gridSizeInCompressed = new int2((int)gridSize.x / 8, (int)gridSize.y /8),
             };
-            job.ScheduleBatch(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
+            simulationJobHandle = JobHandle.CombineDependencies(job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x / 8)), simulationJobHandle);
         }
 
         private void FoneESquare()
@@ -125,7 +138,7 @@ namespace LASK.GoL.CompressBits
                 BaseGrid = Tick % 2 == 1 ? gridBack.Reinterpret<ulong>() : gridFront.Reinterpret<ulong>(),
                 NewGrid = Tick % 2 == 1 ? gridFront.Reinterpret<ulong>() : gridBack.Reinterpret<ulong>(),
             };
-            job.ScheduleBatch(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
+            simulationJobHandle = JobHandle.CombineDependencies(job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x / 8)),simulationJobHandle);
         }
 
         private void OnDestroy()
@@ -183,7 +196,7 @@ namespace LASK.GoL.CompressBits
                 //batchCnt = 4,
                 gridSizeInCompressed = new uint2((uint)gridSize.x / 64, (uint)gridSize.y),
             };
-            job.Schedule(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
+            simulationJobHandle = JobHandle.CombineDependencies(job.Schedule(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)), simulationJobHandle);
         }
 
 
@@ -199,7 +212,7 @@ namespace LASK.GoL.CompressBits
                 neighborMarker = new ProfilerMarker("NeighbourCounting"),
                 aliveMarker = new ProfilerMarker("AliveCounting")
             };
-            job.Schedule(gridFront.Length, math.min((int)(gridSize.x*gridSize.y/64), (int)gridSize.x / 4)).Complete();
+            simulationJobHandle = JobHandle.CombineDependencies(job.Schedule(gridFront.Length, math.min(1024, (int)gridSize.x / 8)), simulationJobHandle);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -213,7 +226,7 @@ namespace LASK.GoL.CompressBits
                 BaseGrid = Tick % 2 == 1 ? gridBack.Reinterpret<ulong>() : gridFront.Reinterpret<ulong>(),
                 NewGrid = Tick % 2 == 1 ? gridFront.Reinterpret<ulong>() : gridBack.Reinterpret<ulong>(),
             };
-            job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x)).Complete();
+            simulationJobHandle = JobHandle.CombineDependencies(job.ScheduleBatch(gridFront.Length, math.min(1024, (int)gridSize.x)), simulationJobHandle);
         }
 
 

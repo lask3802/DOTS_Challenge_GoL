@@ -156,9 +156,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 10384280}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 10384281}
 --- !u!114 &10384280
 MonoBehaviour:
@@ -179,7 +176,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &10384281
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -278,9 +275,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 335486196}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 335486197}
 --- !u!114 &335486196
 MonoBehaviour:
@@ -301,7 +295,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &335486197
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -400,9 +394,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 491979338}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 491979339}
 --- !u!114 &491979338
 MonoBehaviour:
@@ -423,7 +414,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &491979339
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -619,9 +610,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 677409815}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 677409816}
 --- !u!114 &677409815
 MonoBehaviour:
@@ -642,7 +630,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &677409816
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -803,9 +791,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 751140853}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 751140854}
 --- !u!114 &751140853
 MonoBehaviour:
@@ -826,7 +811,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &751140854
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -925,9 +910,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 765747885}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 765747886}
 --- !u!114 &765747885
 MonoBehaviour:
@@ -948,7 +930,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &765747886
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1112,9 +1094,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 869362166}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 869362162}
 --- !u!114 &869362166
 MonoBehaviour:
@@ -1169,9 +1148,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 1133765993}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 1133765994}
 --- !u!114 &1133765993
 MonoBehaviour:
@@ -1192,7 +1168,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &1133765994
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1291,9 +1267,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 1342528206}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 1342528207}
 --- !u!114 &1342528206
 MonoBehaviour:
@@ -1314,7 +1287,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &1342528207
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1470,9 +1443,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 1440684989}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 1440684990}
 --- !u!114 &1440684989
 MonoBehaviour:
@@ -1493,7 +1463,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &1440684990
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1592,9 +1562,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 1442157268}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 1442157269}
 --- !u!114 &1442157268
 MonoBehaviour:
@@ -1615,7 +1582,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &1442157269
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1714,9 +1681,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 1539965951}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 1539965952}
 --- !u!114 &1539965951
 MonoBehaviour:
@@ -1737,7 +1701,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &1539965952
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1988,9 +1952,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 1619976154}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 1619976155}
 --- !u!114 &1619976154
 MonoBehaviour:
@@ -2011,7 +1972,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &1619976155
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2110,9 +2071,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 1881216079}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 1881216080}
 --- !u!114 &1881216079
 MonoBehaviour:
@@ -2133,7 +2091,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &1881216080
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2232,9 +2190,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 1889519537}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 1889519538}
 --- !u!114 &1889519537
 MonoBehaviour:
@@ -2255,7 +2210,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &1889519538
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2432,9 +2387,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   simulator: {fileID: 2052519478}
-  shader: {fileID: 7200000, guid: cb384bd6558a879429d5d1d558213574, type: 3}
-  squareRenderingShader: {fileID: 7200000, guid: 022de642011cafc48a693aef4e7d212c, type: 3}
-  renderTexture: {fileID: 0}
   meshRenderer: {fileID: 2052519479}
 --- !u!114 &2052519478
 MonoBehaviour:
@@ -2455,7 +2407,7 @@ MonoBehaviour:
   TickTime: 0
   isPaused: 0
   isDebug: 0
-  currentImplementation: 1
+  currentImplementation: 5
 --- !u!23 &2052519479
 MeshRenderer:
   m_ObjectHideFlags: 0

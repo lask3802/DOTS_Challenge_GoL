@@ -91,6 +91,7 @@ namespace DynamicSize.System
             var e = SystemAPI.GetSingletonEntity<CellsManagement>();
             var cellsManagement = SystemAPI.GetSingleton<CellsManagement>();
             cellsManagement.Dispose();
+            state.EntityManager.RemoveComponent<CellsManagement>(e);
             state.EntityManager.DestroyEntity(e);
             Debug.Log("InitGoLSystem Destroyed");
         }
